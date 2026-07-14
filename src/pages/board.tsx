@@ -35,10 +35,10 @@ function Banner({ status }: { status: Status }) {
   return (
     <div
       class="flex items-center gap-3 border px-3 py-2 sm:px-4 sm:py-3"
-      style={`background-color:${tint(status, 18)};border-color:${statusVar[status]}`}
+      style={`background-color:${tint(status, 20)};border-color:${statusVar[status]}`}
     >
       <StatusIcon status={status} size={28} />
-      <div class="flex flex-1 items-center justify-between gap-2">
+      <div class="flex flex-1 flex-wrap items-center justify-between gap-2">
         <span class="text-xl font-semibold">{bannerLabel[status]}</span>
         <span class="font-mono text-xs text-muted-foreground">{fmtUtc(new Date().toISOString())} (UTC)</span>
       </div>
@@ -79,30 +79,30 @@ function ComponentCard({ c, board }: { c: Component; board: StatusBoard }) {
 
   return (
     <div class="space-y-2">
-      <div class="flex items-center justify-between gap-2">
-        <div class="flex min-w-0 items-center gap-1.5">
-          <span class="truncate font-mono text-base font-medium leading-5">{c.name}</span>
+      <div class="flex items-center justify-between">
+        <div class="flex min-w-0 items-center gap-2">
+          <span class="text-foreground truncate font-mono text-base font-medium leading-5">{c.name}</span>
           {c.description ? (
             <span class="text-muted-foreground" title={c.description}>
-              <Icon path={ICONS.info} size={13} />
+              <Icon path={ICONS.info} size={16} />
             </span>
           ) : null}
         </div>
         <div class="flex items-center gap-3">
           {showUptime && pct != null ? (
-            <span class="font-mono text-sm text-foreground/80">
+            <span class="text-foreground/80 font-mono text-sm leading-none">
               {(Math.floor(pct * 100) / 100).toFixed(pct >= 100 ? 0 : 2)}%
             </span>
           ) : (
-            <span class={`font-mono text-sm ${statusText[status]}`}>{componentLabel[status]}</span>
+            <span class={`font-mono text-sm leading-none ${statusText[status]}`}>{componentLabel[status]}</span>
           )}
-          <StatusIcon status={status} size={14} />
+          <StatusIcon status={status} size={13} />
         </div>
       </div>
       {showUptime ? (
         <div class="space-y-2">
           <UptimeBar days={days} />
-          <div class="flex items-center justify-between font-mono text-xs text-muted-foreground">
+          <div class="text-muted-foreground flex items-center justify-between font-mono text-xs leading-none">
             <span>{days.length} days ago</span>
             <span>Today</span>
           </div>

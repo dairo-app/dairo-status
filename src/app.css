@@ -1,6 +1,23 @@
 @import "tailwindcss";
 @source "./";
 
+/* Self-hosted Geist (sans + mono) — the brand typefaces. Served from /fonts (same-origin,
+   so the strict font-src CSP is satisfied). */
+@font-face {
+  font-family: "Geist";
+  src: url("/fonts/Geist-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/fonts/GeistMono-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* Class-based dark mode (the theme switcher toggles `.dark` on <html>; "system" reads
    prefers-color-scheme via an inline bootstrap script). */
 @custom-variant dark (&:where(.dark, .dark *));
@@ -81,8 +98,8 @@
   --color-warning: var(--warning);
   --color-destructive: var(--destructive);
   --color-info: var(--info);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Commit Mono", Menlo, Consolas, monospace;
+  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
 }
 
 @layer base {

@@ -15,6 +15,7 @@
     "db:remote": "wrangler d1 execute dairo-status --remote --file=./db/schema.sql"
   },
   "dependencies": {
+    "geist": "^1.7.2",
     "hono": "^4.6.14"
   },
   "devDependencies": {

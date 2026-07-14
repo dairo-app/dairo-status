@@ -24,6 +24,14 @@ function toStatus(raw: string | null): Status {
   return "empty";
 }
 
+/** component id -> display name, for labelling affected-component badges on the events views. */
+export async function componentNames(env: Env): Promise<Record<number, string>> {
+  const rows = await env.DB.prepare("SELECT id, name FROM components").all<Record<string, unknown>>();
+  const out: Record<number, string> = {};
+  for (const r of rows.results ?? []) out[Number(r.id)] = String(r.name);
+  return out;
+}
+
 export async function loadPage(env: Env): Promise<Page | null> {
   const row = await env.DB.prepare(
     "SELECT * FROM pages WHERE slug = ? LIMIT 1",

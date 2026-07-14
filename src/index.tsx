@@ -6,7 +6,15 @@ import { Hono } from "hono";
 import type { Env } from "./types";
 import { Layout } from "./ui/layout";
 import { Board } from "./pages/board";
-import { loadBoard, loadMaintenance, loadPage, loadReport, listMaintenances, listReports } from "./data/db";
+import {
+  componentNames,
+  loadBoard,
+  loadMaintenance,
+  loadPage,
+  loadReport,
+  listMaintenances,
+  listReports,
+} from "./data/db";
 import { EventsPage, MaintenanceDetail, ReportDetail } from "./pages/events";
 import { buildFeed } from "./feeds/feed";
 import { handleIngest, handleMonitors } from "./data/ingest";
@@ -38,10 +46,14 @@ app.get("/", async (c) => {
 app.get("/events", async (c) => {
   const page = await loadPage(c.env);
   if (!page) return c.notFound();
-  const [reports, maintenances] = await Promise.all([listReports(c.env, 90), listMaintenances(c.env, 90)]);
+  const [reports, maintenances, names] = await Promise.all([
+    listReports(c.env, 90),
+    listMaintenances(c.env, 90),
+    componentNames(c.env),
+  ]);
   return c.html(
     <Layout env={c.env} page={page} active="events" title="Events">
-      <EventsPage env={c.env} page={page} reports={reports} maintenances={maintenances} />
+      <EventsPage env={c.env} page={page} reports={reports} maintenances={maintenances} names={names} />
     </Layout>,
   );
 });
@@ -50,9 +62,10 @@ app.get("/events/report/:id", async (c) => {
   const page = await loadPage(c.env);
   const report = await loadReport(c.env, Number(c.req.param("id")));
   if (!page || !report) return c.notFound();
+  const names = await componentNames(c.env);
   return c.html(
     <Layout env={c.env} page={page} active="events" title={report.title}>
-      <ReportDetail env={c.env} page={page} report={report} />
+      <ReportDetail env={c.env} page={page} report={report} names={names} />
     </Layout>,
   );
 });
@@ -61,9 +74,10 @@ app.get("/events/maintenance/:id", async (c) => {
   const page = await loadPage(c.env);
   const maintenance = await loadMaintenance(c.env, Number(c.req.param("id")));
   if (!page || !maintenance) return c.notFound();
+  const names = await componentNames(c.env);
   return c.html(
     <Layout env={c.env} page={page} active="events" title={maintenance.title}>
-      <MaintenanceDetail env={c.env} page={page} maintenance={maintenance} />
+      <MaintenanceDetail env={c.env} page={page} maintenance={maintenance} names={names} />
     </Layout>,
   );
 });
