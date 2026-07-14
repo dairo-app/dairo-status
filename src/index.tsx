@@ -86,7 +86,7 @@ app.get("/verify/:token", async (c) => {
   if (!page) return c.notFound();
   return c.html(
     <Layout env={c.env} page={page} title="Confirm subscription">
-      <VerifyPage env={c.env} token={c.req.param("token")} />
+      {await VerifyPage({ env: c.env, token: c.req.param("token") ?? "" })}
     </Layout>,
   );
 });
@@ -96,7 +96,7 @@ app.get("/manage/:token", async (c) => {
   if (!page) return c.notFound();
   return c.html(
     <Layout env={c.env} page={page} title="Manage subscription">
-      <ManagePage env={c.env} token={c.req.param("token")} />
+      {await ManagePage({ env: c.env, token: c.req.param("token") ?? "" })}
     </Layout>,
   );
 });
@@ -107,7 +107,7 @@ app.get("/unsubscribe/:token", async (c) => {
   if (!page) return c.notFound();
   return c.html(
     <Layout env={c.env} page={page} title="Unsubscribe">
-      <UnsubscribePage env={c.env} token={c.req.param("token")} />
+      {await UnsubscribePage({ env: c.env, token: c.req.param("token") ?? "" })}
     </Layout>,
   );
 });
