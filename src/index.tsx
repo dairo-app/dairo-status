@@ -15,7 +15,7 @@ import {
   listMaintenances,
   listReports,
 } from "./data/db";
-import { EventsPage, MaintenanceDetail, ReportDetail } from "./pages/events";
+import { EventNotFound, EventsPage, MaintenanceDetail, ReportDetail } from "./pages/events";
 import { buildFeed } from "./feeds/feed";
 import { handleIngest, handleMonitors } from "./data/ingest";
 import {
@@ -60,8 +60,19 @@ app.get("/events", async (c) => {
 
 app.get("/events/report/:id", async (c) => {
   const page = await loadPage(c.env);
+  if (!page) return c.notFound();
   const report = await loadReport(c.env, Number(c.req.param("id")));
-  if (!page || !report) return c.notFound();
+  if (!report) {
+    return c.html(
+      <Layout env={c.env} page={page} active="events" title="Report not found">
+        <EventNotFound
+          page={page}
+          title="Report not found"
+          description="The report you are looking for does not exist."
+        />
+      </Layout>,
+    );
+  }
   const names = await componentNames(c.env);
   return c.html(
     <Layout env={c.env} page={page} active="events" title={report.title}>
@@ -72,8 +83,19 @@ app.get("/events/report/:id", async (c) => {
 
 app.get("/events/maintenance/:id", async (c) => {
   const page = await loadPage(c.env);
+  if (!page) return c.notFound();
   const maintenance = await loadMaintenance(c.env, Number(c.req.param("id")));
-  if (!page || !maintenance) return c.notFound();
+  if (!maintenance) {
+    return c.html(
+      <Layout env={c.env} page={page} active="events" title="Maintenance not found">
+        <EventNotFound
+          page={page}
+          title="Maintenance not found"
+          description="The maintenance you are looking for does not exist."
+        />
+      </Layout>,
+    );
+  }
   const names = await componentNames(c.env);
   return c.html(
     <Layout env={c.env} page={page} active="events" title={maintenance.title}>

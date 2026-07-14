@@ -79,9 +79,15 @@ const ICON_PATHS: Record<Status, string> = {
   empty: '<circle cx="12" cy="12" r="10"/>',
 };
 
-/** A status icon inside a filled square (the small dot on each row, or the banner badge). */
-export function StatusIcon({ status, size = 12.5 }: { status: Status; size?: number }) {
-  const inner = Math.round(size * 0.72 * 10) / 10;
+/** A status icon inside a filled square (the small dot on each row, or the banner badge).
+ *  `inner` overrides the glyph size (the banner uses a 16px glyph in a 28px circle to match
+ *  `size-7 [&>svg]:size-4`; otherwise the glyph is size*0.72, matching the 12.5→9 component dot). */
+export function StatusIcon({
+  status,
+  size = 12.5,
+  inner,
+}: { status: Status; size?: number; inner?: number }) {
+  const innerSize = inner ?? Math.round(size * 0.72 * 10) / 10;
   return (
     <span
       class={`inline-flex shrink-0 items-center justify-center rounded-full text-background ${statusBg[status]}`}
@@ -89,12 +95,12 @@ export function StatusIcon({ status, size = 12.5 }: { status: Status; size?: num
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
-        width={inner}
-        height={inner}
+        width={innerSize}
+        height={innerSize}
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
-        stroke-width="3"
+        stroke-width="2"
         stroke-linecap="round"
         stroke-linejoin="round"
       >
