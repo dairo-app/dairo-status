@@ -10,7 +10,7 @@ assets = { directory = "./public", binding = "ASSETS" }
 [[d1_databases]]
 binding = "DB"
 database_name = "dairo-status"
-database_id = "PLACEHOLDER_D1_ID"
+database_id = "82b2dee4-6734-4d40-b349-b75860bf29b5"
 
 [vars]
 PAGE_SLUG = "status"
