@@ -1,5 +1,6 @@
 /** The status vocabulary: colors, human labels, and icons. Shared by every view so the
  *  board, banner, and feed stay visually consistent. */
+import { raw } from "hono/html";
 import type { Status } from "../types";
 
 /** CSS variable backing each status color (used inline for bar segments / dots). */
@@ -96,8 +97,9 @@ export function StatusIcon({ status, size = 12.5 }: { status: Status; size?: num
         stroke-width="3"
         stroke-linecap="round"
         stroke-linejoin="round"
-        dangerouslySetInnerHTML={{ __html: ICON_PATHS[status] }}
-      />
+      >
+        {raw(ICON_PATHS[status])}
+      </svg>
     </span>
   );
 }
@@ -116,8 +118,9 @@ export function Icon({ path, size = 16, cls = "" }: { path: string; size?: numbe
       stroke-linecap="round"
       stroke-linejoin="round"
       class={cls}
-      dangerouslySetInnerHTML={{ __html: path }}
-    />
+    >
+      {raw(path)}
+    </svg>
   );
 }
 

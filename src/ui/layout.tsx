@@ -1,6 +1,7 @@
 /** The page shell: <head> (SEO + theme bootstrap), header nav, footer. Every route renders
  *  its body inside <Layout>. Kept framework-free — server-rendered HTML with two tiny inline
  *  scripts (theme + subscribe) so there is nothing to hydrate. */
+import { raw } from "hono/html";
 import type { Child } from "hono/jsx";
 import type { Env, Page } from "../types";
 import { Icon, ICONS } from "./status";
@@ -53,7 +54,7 @@ export function Layout({ env, page, title, description, active, children }: Layo
         />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link rel="stylesheet" href="/styles.css" />
-        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
+        <script>{raw(THEME_BOOTSTRAP)}</script>
       </head>
       <body class="font-sans">
         <div class="flex min-h-screen flex-col gap-4">
@@ -61,7 +62,7 @@ export function Layout({ env, page, title, description, active, children }: Layo
           <main class="mx-auto flex w-full max-w-2xl flex-1 flex-col px-3 py-2">{children}</main>
           <Footer page={page} env={env} />
         </div>
-        <script dangerouslySetInnerHTML={{ __html: THEME_TOGGLE }} />
+        <script>{raw(THEME_TOGGLE)}</script>
       </body>
     </html>
   );
@@ -173,11 +174,11 @@ function Footer({ page, env }: { page: Page; env: Env }) {
             <Icon path={ICONS.moon} size={14} />
           </button>
         </div>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `try{document.getElementById('ds-tz').lastElementChild.textContent=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';}catch(e){}`,
-          }}
-        />
+        <script>
+          {raw(
+            `try{document.getElementById('ds-tz').lastElementChild.textContent=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';}catch(e){}`,
+          )}
+        </script>
       </div>
     </footer>
   );
