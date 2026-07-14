@@ -1,0 +1,23 @@
+name = "dairo-status"
+main = "src/index.tsx"
+compatibility_date = "2026-06-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Static assets (compiled Tailwind CSS, favicon, icons) served straight from the edge.
+assets = { directory = "./public", binding = "ASSETS" }
+
+# D1 — the status datastore. database_id is filled in after `wrangler d1 create dairo-status`.
+[[d1_databases]]
+binding = "DB"
+database_name = "dairo-status"
+database_id = "PLACEHOLDER_D1_ID"
+
+[vars]
+PAGE_SLUG = "status"
+PUBLIC_URL = "https://status.dairo.app"
+UPTIME_DAYS = "45"
+
+# Secrets (set via `wrangler secret put`): INGEST_TOKEN (checker auth), DAIRO_API_KEY (email send).
+
+[observability]
+enabled = true

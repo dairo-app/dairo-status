@@ -1,0 +1,27 @@
+{
+  "name": "dairo-status",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dairo Status — the public status page for Dairo, email infrastructure for AI agents.",
+  "type": "module",
+  "scripts": {
+    "css": "tailwindcss -i ./src/app.css -o ./public/styles.css --minify",
+    "css:watch": "tailwindcss -i ./src/app.css -o ./public/styles.css --watch",
+    "build": "npm run css",
+    "dev": "npm run css && wrangler dev",
+    "deploy": "npm run css && wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "db:local": "wrangler d1 execute dairo-status --local --file=./db/schema.sql",
+    "db:remote": "wrangler d1 execute dairo-status --remote --file=./db/schema.sql"
+  },
+  "dependencies": {
+    "hono": "^4.6.14"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241218.0",
+    "@tailwindcss/cli": "^4.0.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.7.2",
+    "wrangler": "^4.0.0"
+  }
+}
