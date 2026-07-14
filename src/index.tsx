@@ -9,7 +9,7 @@ import { Board } from "./pages/board";
 import { loadBoard, loadMaintenance, loadPage, loadReport, listMaintenances, listReports } from "./data/db";
 import { EventsPage, MaintenanceDetail, ReportDetail } from "./pages/events";
 import { buildFeed } from "./feeds/feed";
-import { handleIngest } from "./data/ingest";
+import { handleIngest, handleMonitors } from "./data/ingest";
 import {
   handleSubscribe,
   ManagePage,
@@ -113,7 +113,8 @@ app.get("/unsubscribe/:token", async (c) => {
 });
 app.post("/unsubscribe/:token", handleUnsubscribe);
 
-// ── Ingest (health checker → D1) ──────────────────────────────────────────────────────
+// ── Health checker: monitor list + result ingest ─────────────────────────────────────
+app.get("/api/monitors", handleMonitors);
 app.post("/ingest", handleIngest);
 
 export default app;
