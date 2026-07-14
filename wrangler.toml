@@ -16,6 +16,8 @@ database_id = "82b2dee4-6734-4d40-b349-b75860bf29b5"
 PAGE_SLUG = "status"
 PUBLIC_URL = "https://status.dairo.app"
 UPTIME_DAYS = "45"
+# The Dairo inbox subscriber mail is sent FROM (status@dairo.app). Not a secret.
+DAIRO_STATUS_INBOX_ID = "eab7f064-80a1-4c1a-9c3e-b98095a8037b"
 
 # Secrets (set via `wrangler secret put`): INGEST_TOKEN (checker auth), DAIRO_API_KEY (email send).
 

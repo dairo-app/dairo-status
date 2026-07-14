@@ -4,16 +4,15 @@
  *  mailer must never break a page render or a checker ingest. */
 import type { Env } from "../types";
 
-const FROM = "Dairo Status <status@dairo.app>";
-
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-/** The single transport. Everything routes through here. */
+/** The single transport — dogfooded through Dairo's own send API, from the status@dairo.app
+ *  inbox (DAIRO_STATUS_INBOX_ID). Everything routes through here so it's swappable in one place. */
 async function sendEmail(env: Env, msg: { to: string; subject: string; html: string }): Promise<void> {
-  if (!env.DAIRO_API_KEY) {
-    console.error("email skipped — DAIRO_API_KEY is not set");
+  if (!env.DAIRO_API_KEY || !env.DAIRO_STATUS_INBOX_ID) {
+    console.error("email skipped — DAIRO_API_KEY / DAIRO_STATUS_INBOX_ID not set");
     return;
   }
   try {
@@ -23,7 +22,12 @@ async function sendEmail(env: Env, msg: { to: string; subject: string; html: str
         authorization: `Bearer ${env.DAIRO_API_KEY}`,
         "content-type": "application/json",
       },
-      body: JSON.stringify({ from: FROM, to: [msg.to], subject: msg.subject, html: msg.html }),
+      body: JSON.stringify({
+        inboxId: env.DAIRO_STATUS_INBOX_ID,
+        to: [msg.to],
+        subject: msg.subject,
+        html: msg.html,
+      }),
     });
     if (!res.ok) {
       console.error(`email send failed (${res.status}): ${await res.text().catch(() => "")}`);

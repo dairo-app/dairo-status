@@ -8,6 +8,7 @@ export type Env = {
   UPTIME_DAYS: string;
   INGEST_TOKEN?: string;
   DAIRO_API_KEY?: string;
+  DAIRO_STATUS_INBOX_ID?: string;
 };
 
 /** The five visual states a component/page can be in. */
