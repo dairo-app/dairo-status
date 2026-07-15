@@ -46,25 +46,6 @@ function fmtDay(day: string): string {
   });
 }
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-
-/** Overlap (ms) of an event window with a given UTC day; an open event (to=null) runs to now. */
-function eventMsInDay(from: string | null, to: string | null, dayStr: string): number {
-  if (!from) return 0;
-  const dayStart = Date.parse(`${dayStr}T00:00:00Z`);
-  const dayEnd = dayStart + MS_PER_DAY - 1;
-  const start = Math.max(Date.parse(from), dayStart);
-  const end = Math.min(to ? Date.parse(to) : Date.now(), dayEnd);
-  return Math.max(0, end - start);
-}
-
-/** Summed overlap of a set of events within the day, capped at 24h (getTotalEventsDurationMs). */
-function totalEventMs(events: DayEvent[], dayStr: string): number {
-  let total = 0;
-  for (const ev of events) total += eventMsInDay(ev.from, ev.to, dayStr);
-  return Math.min(total, MS_PER_DAY);
-}
-
 /** The day's event-derived color (setDataByType's eventStatus): incidents → error, else the
  *  worst active report color, else maintenance → info, else none. Report DayEvents already
  *  carry their per-day color (floored to degraded/error). */
@@ -77,66 +58,28 @@ function dayEventStatus(events: DayEvent[]): "error" | "degraded" | "info" | und
   return undefined;
 }
 
-/** Downtime-only event day (createErrorOnlyBarData): the error slice takes its true proportion
- *  of the day and the rest is operational green. */
-function errorOnlyBar(errorMs: number): { status: Status; height: number }[] {
-  const errHeight = (Math.min(errorMs, MS_PER_DAY) / MS_PER_DAY) * 100;
-  return [
-    { status: "success", height: 100 - errHeight },
-    { status: "error", height: errHeight },
-  ];
+/** Uptime (%) below which a day of failures reads as a red outage rather than orange
+ *  degradation — the tracker's DegradedPerformance→Outage boundary (calculateUptimeStatus). */
+const OUTAGE_UPTIME = 60;
+
+/** The day's dominant status — the single colour the whole bar takes. Events win (incident →
+ *  error, report → its colour, maintenance → info); otherwise the check data decides: a clean
+ *  day is success (green), ANY failure tips the whole day to degraded (orange), and a
+ *  majority-down day to error (red). This is the original "dominant" bar rule — one colour per
+ *  day, never proportional slivers. */
+function dayStatus(day: UptimeDay & { events?: DayEvent[] }): Status {
+  const eventStatus = dayEventStatus(day.events ?? []);
+  if (eventStatus) return eventStatus;
+  if (day.total === 0) return "empty";
+  const errCount = day.total - day.ok;
+  if (errCount <= 0) return "success";
+  return (day.ok / day.total) * 100 < OUTAGE_UPTIME ? "error" : "degraded";
 }
 
-/** Mixed event day (createProportionalBarData): downtime keeps its real share of the day;
- *  maintenance/degraded "highlight" slices split the remaining (non-error) space. */
-function proportionalBar(
-  segments: { status: Status; count: number }[],
-): { status: Status; height: number }[] {
-  const errorMs = segments.filter((s) => s.status === "error").reduce((a, s) => a + s.count, 0);
-  const errHeight = (Math.min(errorMs, MS_PER_DAY) / MS_PER_DAY) * 100;
-  const remaining = Math.max(0, 100 - errHeight);
-  const highlight = segments.filter((s) => s.status !== "error");
-  const highlightTotal = highlight.reduce((a, s) => a + s.count, 0);
-  return segments.map((s) => {
-    if (s.status === "error") return { status: s.status, height: errHeight };
-    return {
-      status: s.status,
-      height: highlightTotal > 0 ? (s.count / highlightTotal) * remaining : remaining / highlight.length,
-    };
-  });
-}
-
-/** Top-to-bottom segments for one day's bar (heights are percentages). Faithful port of the
- *  original setDataByType (barType "absolute"): a day with incidents/reports/maintenance is
- *  painted from event DURATIONS (downtime at its true scale, maintenance/degraded as highlight
- *  slices); an ordinary day is the proportional success/degraded/error split of the day's
- *  request counts — no minimum floor, so downtime shows at its real size, exactly as before. */
+/** One full-height segment per day: the whole bar is the day's dominant colour. The original
+ *  did not paint proportional slivers — a day was wholly green, orange, red, blue or grey. */
 function daySegments(day: UptimeDay & { events?: DayEvent[] }): { status: Status; height: number }[] {
-  const events = day.events ?? [];
-
-  if (dayEventStatus(events)) {
-    const maintenances = events.filter((e) => e.type === "maintenance");
-    const degradedReports = events.filter((e) => e.type === "report" && e.status === "degraded");
-    const errorEvents = events.filter(
-      (e) => e.type === "incident" || (e.type === "report" && e.status === "error"),
-    );
-    const segs = [
-      { status: "info" as Status, count: totalEventMs(maintenances, day.day) },
-      { status: "degraded" as Status, count: totalEventMs(degradedReports, day.day) },
-      { status: "error" as Status, count: totalEventMs(errorEvents, day.day) },
-    ].filter((s) => s.count > 0);
-    if (segs.length === 1 && segs[0].status === "error") return errorOnlyBar(segs[0].count);
-    if (segs.length > 0) return proportionalBar(segs);
-  }
-
-  if (day.total === 0) return [{ status: "empty", height: 100 }];
-  const errCount = Math.max(0, day.total - day.ok);
-  const segs = [
-    { status: "success" as Status, count: day.ok },
-    { status: "error" as Status, count: errCount },
-  ].filter((s) => s.count > 0);
-  if (segs.length === 0) return [{ status: "success", height: 100 }];
-  return segs.map((s) => ({ status: s.status, height: (s.count / day.total) * 100 }));
+  return [{ status: dayStatus(day), height: 100 }];
 }
 
 /** The day's request breakdown rows (requests cardType): a "N reqs" row per non-zero status
@@ -565,7 +508,7 @@ function Bar({ day, index, edge }: { day: UptimeDay; index: number; edge: "first
       {/* CSS-only hover card (side top), scoped to THIS bar's named group so hovering one bar
           never reveals its siblings' cards. Fades/zooms/slides in like the original. */}
       <div
-        class={`pointer-events-none absolute bottom-[calc(100%+4px)] ${cardPosition(edge)} z-50 w-auto min-w-40 translate-y-2 scale-95 border bg-popover p-0 text-popover-foreground opacity-0 shadow-md transition group-hover/bar:pointer-events-auto group-hover/bar:translate-y-0 group-hover/bar:scale-100 group-hover/bar:opacity-100 group-focus-within/bar:pointer-events-auto group-focus-within/bar:translate-y-0 group-focus-within/bar:scale-100 group-focus-within/bar:opacity-100`}
+        class={`pointer-events-none absolute bottom-[calc(100%+4px)] ${cardPosition(edge)} z-50 hidden w-auto min-w-40 border bg-popover p-0 text-popover-foreground shadow-md group-hover/bar:pointer-events-auto group-hover/bar:block group-focus-within/bar:pointer-events-auto group-focus-within/bar:block`}
       >
         <div data-slot="status-bar-card" class="font-sans">
           <div class="p-2 text-xs">{fmtDay(day.day)}</div>
