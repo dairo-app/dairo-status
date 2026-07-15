@@ -46,14 +46,19 @@ function fmtDay(day: string): string {
   });
 }
 
-/** Top-to-bottom segments for one day's bar (heights are percentages summing to 100). */
+/** Minimum height (%) for a non-success segment, so a day with ANY failures is visibly
+ *  marked rather than rendering a sub-pixel red sliver (1 error in 720 checks ≈ 0.14%). */
+const MIN_FAULT_HEIGHT = 14;
+
+/** Top-to-bottom segments for one day's bar (heights are percentages summing to 100).
+ *  Proportional to request counts, but the error slice is floored so downtime is visible. */
 function daySegments(day: UptimeDay): { status: Status; height: number }[] {
   if (day.total === 0) return [{ status: "empty", height: 100 }];
-  const okPct = (day.ok / day.total) * 100;
-  const errPct = 100 - okPct;
-  if (errPct === 0) return [{ status: "success", height: 100 }];
+  const errCount = Math.max(0, day.total - day.ok);
+  if (errCount === 0) return [{ status: "success", height: 100 }];
+  const errPct = Math.min(100, Math.max((errCount / day.total) * 100, MIN_FAULT_HEIGHT));
   return [
-    { status: "success", height: okPct },
+    { status: "success", height: 100 - errPct },
     { status: "error", height: errPct },
   ];
 }
@@ -465,14 +470,14 @@ function Bar({ day, index, edge }: { day: UptimeDay; index: number; edge: "first
 
   return (
     <div
-      class="group focus-visible:ring-ring/50 relative flex h-full flex-1 cursor-pointer flex-col outline-none focus-visible:ring-[2px] aria-pressed:opacity-80"
+      class="group/bar focus-visible:ring-ring/50 relative flex h-full flex-1 cursor-pointer flex-col outline-none focus-visible:ring-[2px] aria-pressed:opacity-80"
       tabindex={0}
       role="button"
       data-slot="status-bar-item"
       aria-label={`Day ${index + 1} status`}
     >
-      {/* Only the bar visuals dim on hover/focus; the portaled-equivalent card stays crisp. */}
-      <div class="flex h-full w-full flex-col overflow-hidden group-hover:opacity-80 group-focus-visible:opacity-80">
+      {/* Only the bar visuals dim on hover/focus; the card (scoped to THIS bar) stays crisp. */}
+      <div class="flex h-full w-full flex-col overflow-hidden group-hover/bar:opacity-80 group-focus-within/bar:opacity-80">
         {bar.map((segment) => (
           <div
             class="w-full transition-all"
@@ -480,11 +485,12 @@ function Bar({ day, index, edge }: { day: UptimeDay; index: number; edge: "first
           />
         ))}
       </div>
-      {/* CSS-only hover card (side top): fades/zooms/slides in, full opacity like the original. */}
+      {/* CSS-only hover card (side top), scoped to THIS bar's named group so hovering one bar
+          never reveals its siblings' cards. Fades/zooms/slides in like the original. */}
       <div
-        class={`pointer-events-none absolute bottom-[calc(100%+4px)] ${cardPosition(edge)} z-50 w-auto min-w-40 translate-y-2 scale-95 border bg-popover p-0 text-popover-foreground opacity-0 shadow-md transition group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:scale-100 group-hover:opacity-100 group-focus:pointer-events-auto group-focus:translate-y-0 group-focus:scale-100 group-focus:opacity-100`}
+        class={`pointer-events-none absolute bottom-[calc(100%+4px)] ${cardPosition(edge)} z-50 w-auto min-w-40 translate-y-2 scale-95 border bg-popover p-0 text-popover-foreground opacity-0 shadow-md transition group-hover/bar:pointer-events-auto group-hover/bar:translate-y-0 group-hover/bar:scale-100 group-hover/bar:opacity-100 group-focus-within/bar:pointer-events-auto group-focus-within/bar:translate-y-0 group-focus-within/bar:scale-100 group-focus-within/bar:opacity-100`}
       >
-        <div data-slot="status-bar-card">
+        <div data-slot="status-bar-card" class="font-sans">
           <div class="p-2 text-xs">{fmtDay(day.day)}</div>
           {rows.length > 0 ? (
             <>
