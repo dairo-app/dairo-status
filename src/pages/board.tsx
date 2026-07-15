@@ -279,7 +279,7 @@ function ReportUpdateEntry({
             </div>
             <div
               data-slot="status-event-timeline-message"
-              class="text-muted-foreground py-1.5 font-sans text-sm"
+              class="py-1.5 font-sans text-sm text-black dark:text-white"
             >
               {update.message.trim() === "" ? (
                 <span class="text-muted-foreground/70">-</span>
@@ -323,7 +323,7 @@ function MaintenanceEntry({ m, withDot = true }: { m: Maintenance; withDot?: boo
             </div>
             <div
               data-slot="status-event-timeline-message"
-              class="text-muted-foreground py-1.5 font-sans text-sm"
+              class="py-1.5 font-sans text-sm text-black dark:text-white"
             >
               {m.message.trim() === "" ? (
                 <span class="text-muted-foreground/70">-</span>
@@ -398,7 +398,7 @@ function Affected({ names }: { names: string[] }) {
       {names.map((n) => (
         <span
           data-slot="status-event-affected-badge"
-          class="bg-secondary text-secondary-foreground inline-flex w-fit shrink-0 items-center justify-center whitespace-nowrap border border-transparent px-2 py-0.5 text-[10px] font-medium"
+          class="bg-secondary text-secondary-foreground inline-flex w-fit shrink-0 items-center justify-center whitespace-nowrap rounded-md border border-black/10 px-2 py-0.5 text-[10px] font-medium dark:border-white/10"
         >
           {n}
         </span>
