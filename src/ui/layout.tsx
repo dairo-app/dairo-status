@@ -350,7 +350,8 @@ export function GetUpdates({ env }: { env: Env }) {
 function CopyInput({ value }: { value: string }) {
   return (
     <div data-slot="status-updates-copy-input" class="relative w-full">
-      <input readonly value={value} onclick="this.select()" class={INPUT_CLASS} />
+      {/* pr-10 keeps the (long) value clear of the absolutely-positioned copy button. */}
+      <input readonly value={value} onclick="this.select()" class={`${INPUT_CLASS} pr-10`} />
       <button
         type="button"
         onclick={`var b=this,i=b.parentNode.querySelector('input');i.select();if(navigator.clipboard){navigator.clipboard.writeText(i.value);var s=b.querySelector('svg');if(s){var o=s.innerHTML;s.innerHTML='${CHECK_ICON}';setTimeout(function(){s.innerHTML=o;},1000);}}`}
