@@ -581,64 +581,9 @@ function reportResolvedOnly(report: Report): boolean {
 }
 
 // ── Empty state ───────────────────────────────────────────────────────────────────────
-/** Placeholder page-header row (logo dot, three nav bars, one action bar). */
-function BlankPageHeader() {
-  return (
-    <div class="flex w-full items-center justify-between gap-4">
-      <div class="bg-accent/60 size-3 rounded-sm" />
-      <div class="flex flex-row gap-1">
-        <div class="bg-accent/60 h-3 w-8 rounded-sm" />
-        <div class="bg-accent/60 h-3 w-8 rounded-sm" />
-        <div class="bg-accent/60 h-3 w-8 rounded-sm" />
-      </div>
-      <div class="bg-accent/60 h-3 w-8 rounded-sm" />
-    </div>
-  );
-}
-
-/** Placeholder timeline update row (dot + two labels + two message lines). */
-function BlankReportUpdate() {
-  return (
-    <div class="flex w-full items-start gap-2">
-      <div class="flex h-full flex-col items-center gap-0.5">
-        <div class="bg-accent size-3 rounded-sm" />
-      </div>
-      <div class="flex flex-1 flex-col gap-1 pb-2">
-        <div class="flex items-center gap-1">
-          <div class="bg-accent h-3 w-12 rounded-sm" />
-          <div class="bg-accent h-3 w-16 rounded-sm" />
-        </div>
-        <div class="bg-accent h-3 w-full rounded-sm" />
-        <div class="bg-accent h-3 w-full rounded-sm" />
-      </div>
-    </div>
-  );
-}
-
-/** A single stacked skeleton report card (page chrome + two updates + fade overlay). */
-function BlankReport({ cls = "" }: { cls?: string }) {
-  return (
-    <div
-      class={`border-border/70 bg-background relative flex w-full max-w-xs flex-1 flex-col items-center justify-center gap-4 overflow-hidden rounded-lg border px-3 py-2 text-center ${cls}`}
-    >
-      <BlankPageHeader />
-      <div class="flex w-full flex-col">
-        <BlankReportUpdate />
-        <BlankReportUpdate />
-      </div>
-      <div class="to-background absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gradient-to-b from-transparent from-40% p-2" />
-    </div>
-  );
-}
-
 function BlankEvents({ title, description }: { title: string; description: string }) {
   return (
-    <div class="bg-muted/30 flex flex-col items-center justify-center gap-2.5 rounded-lg border px-3 py-2 text-center sm:px-8 sm:py-6">
-      <div class="relative mt-8 flex w-full flex-col items-center justify-center">
-        <BlankReport cls="absolute -top-16 scale-60 opacity-50" />
-        <BlankReport cls="absolute -top-8 scale-80 opacity-80" />
-        <BlankReport />
-      </div>
+    <div class="bg-muted/30 flex flex-col items-center justify-center gap-2.5 rounded-lg border px-3 py-8 text-center sm:px-8 sm:py-12">
       <div class="space-y-1">
         <div class="font-medium">{title}</div>
         <div class="text-muted-foreground font-mono text-sm">{description}</div>
