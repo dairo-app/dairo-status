@@ -346,15 +346,23 @@ export function GetUpdates({ env }: { env: Env }) {
   );
 }
 
-/** Readonly URL field with a copy button (click field or button copies). */
+/** Readonly URL field with a copy button. Copy reads the value directly — it does NOT select
+ *  the text (no highlight) and the field can't take focus (no ring / box growth); the only
+ *  feedback is the subtle copy→check glyph flip on the button. */
 function CopyInput({ value }: { value: string }) {
   return (
     <div data-slot="status-updates-copy-input" class="relative w-full">
-      {/* pr-10 keeps the (long) value clear of the absolutely-positioned copy button. */}
-      <input readonly value={value} onclick="this.select()" class={`${INPUT_CLASS} pr-10`} />
+      {/* pointer-events-none + tabindex -1: pure display, so a click never focuses/selects it.
+          pr-10 keeps the (long) value clear of the absolutely-positioned copy button. */}
+      <input
+        readonly
+        tabindex={-1}
+        value={value}
+        class={`${INPUT_CLASS} pointer-events-none pr-10`}
+      />
       <button
         type="button"
-        onclick={`var b=this,i=b.parentNode.querySelector('input');i.select();if(navigator.clipboard){navigator.clipboard.writeText(i.value);var s=b.querySelector('svg');if(s){var o=s.innerHTML;s.innerHTML='${CHECK_ICON}';setTimeout(function(){s.innerHTML=o;},1000);}}`}
+        onclick={`var b=this,i=b.parentNode.querySelector('input');if(navigator.clipboard){navigator.clipboard.writeText(i.value);}var s=b.querySelector('svg');if(s){var o=s.innerHTML;s.innerHTML='${CHECK_ICON}';setTimeout(function(){s.innerHTML=o;},1000);}`}
         class={`${BTN_BASE} ${BTN_OUTLINE} absolute top-1/2 right-2 size-6 -translate-y-1/2`}
       >
         <Icon path={COPY_ICON} size={16} />
