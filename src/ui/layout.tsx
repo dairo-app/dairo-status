@@ -264,6 +264,9 @@ export function GetUpdates({ env }: { env: Env }) {
             <button type="button" data-tab="email" data-active="true" class={tab}>
               Email
             </button>
+            <button type="button" data-tab="slack" class={tab}>
+              Slack
+            </button>
             <button type="button" data-tab="rss" class={tab}>
               RSS
             </button>
@@ -304,6 +307,16 @@ export function GetUpdates({ env }: { env: Env }) {
               >
                 Subscribe
               </button>
+            </div>
+          </div>
+
+          {/* Slack — the /feed slash command to paste into any channel (Slack's RSS app). */}
+          <div data-panel="slack" hidden class="flex-1 outline-none">
+            <div class="flex flex-col gap-2 px-2 py-2">
+              <div class="text-sm">
+                For status updates in Slack, paste the text below into any channel.
+              </div>
+              <CopyInput value={`/feed subscribe ${rssUrl}`} />
             </div>
           </div>
 
