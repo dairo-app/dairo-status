@@ -21,5 +21,15 @@ DAIRO_STATUS_INBOX_ID = "eab7f064-80a1-4c1a-9c3e-b98095a8037b"
 
 # Secrets (set via `wrangler secret put`): INGEST_TOKEN (checker auth), DAIRO_API_KEY (email send).
 
+# Subscriber mail goes to the Dairo API (api.dairo.app/v1/messages). That host is a
+# Cloudflare-proxied CNAME to a DIFFERENT Cloudflare account (Supabase), so a direct
+# Worker subrequest is rejected with Cloudflare error 1014 (CNAME cross-user banned) —
+# every notification silently failed. We instead call the Dairo edge worker (same
+# account) through a service binding: it runs in-network (no DNS, no 1014, no Access
+# redirect) and injects the origin's CF-Access token + edge secret itself.
+[[services]]
+binding = "DAIRO_EDGE"
+service = "dairo-edge"
+
 [observability]
 enabled = true

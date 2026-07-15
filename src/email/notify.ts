@@ -15,20 +15,27 @@ async function sendEmail(env: Env, msg: { to: string; subject: string; html: str
     console.error("email skipped — DAIRO_API_KEY / DAIRO_STATUS_INBOX_ID not set");
     return;
   }
+  const endpoint = "https://api.dairo.app/v1/messages";
+  const init: RequestInit = {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${env.DAIRO_API_KEY}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      inboxId: env.DAIRO_STATUS_INBOX_ID,
+      to: [msg.to],
+      subject: msg.subject,
+      html: msg.html,
+    }),
+  };
   try {
-    const res = await fetch("https://api.dairo.app/v1/messages", {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${env.DAIRO_API_KEY}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        inboxId: env.DAIRO_STATUS_INBOX_ID,
-        to: [msg.to],
-        subject: msg.subject,
-        html: msg.html,
-      }),
-    });
+    // Prefer the edge service binding: a plain fetch to api.dairo.app from a Worker is
+    // rejected with Cloudflare 1014 (the host is a cross-account proxied CNAME). The
+    // binding invokes the Dairo edge worker in-network, which reaches the origin for us.
+    const res = env.DAIRO_EDGE
+      ? await env.DAIRO_EDGE.fetch(endpoint, init)
+      : await fetch(endpoint, init);
     if (!res.ok) {
       console.error(`email send failed (${res.status}): ${await res.text().catch(() => "")}`);
     }

@@ -9,6 +9,9 @@ export type Env = {
   INGEST_TOKEN?: string;
   DAIRO_API_KEY?: string;
   DAIRO_STATUS_INBOX_ID?: string;
+  /** Service binding to the Dairo edge worker — the in-network path to api.dairo.app
+   *  that dodges the Cloudflare 1014 cross-user-CNAME ban on direct Worker subrequests. */
+  DAIRO_EDGE?: Fetcher;
 };
 
 /** The five visual states a component/page can be in. */
