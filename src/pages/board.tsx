@@ -129,7 +129,7 @@ function RichTsRow({
       <dt class="text-muted-foreground" data-rich-ts-tzlabel={tzLabel ? "" : undefined}>
         {label}
       </dt>
-      <dd class="flex items-center gap-1 truncate font-mono">
+      <dd class="flex items-center gap-1 truncate font-sans">
         <span class="invisible group-hover/row:visible">
           <Icon path={COPY_ICON} size={12} />
         </span>
@@ -201,7 +201,7 @@ function ImpactLabel({ changes }: { changes: { name: string; impact: string }[] 
     <span class="group/impact relative inline-block">
       <button
         type="button"
-        class={`decoration-muted-foreground/30 hover:decoration-muted-foreground/60 font-mono text-xs font-medium underline decoration-dashed underline-offset-4 ${impactText[worst]}`}
+        class={`decoration-muted-foreground/30 hover:decoration-muted-foreground/60 font-sans text-xs font-medium underline decoration-dashed underline-offset-4 ${impactText[worst]}`}
       >
         {impactLabel[worst] ?? worst}
       </button>
@@ -209,7 +209,7 @@ function ImpactLabel({ changes }: { changes: { name: string; impact: string }[] 
         {changes.map((change) => (
           <span class="flex items-center justify-between gap-4 text-xs">
             <span class="truncate">{change.name}</span>
-            <span class={`shrink-0 font-mono ${impactText[change.impact] ?? ""}`}>
+            <span class={`shrink-0 font-sans ${impactText[change.impact] ?? ""}`}>
               {impactLabel[change.impact] ?? change.impact}
             </span>
           </span>
@@ -270,16 +270,16 @@ function ReportUpdateEntry({
                 </>
               ) : null}
               <span class="text-muted-foreground/70 mx-0.5">·</span>{" "}
-              <span class="text-muted-foreground font-mono text-xs">
+              <span class="text-muted-foreground font-sans text-xs">
                 <RichTs date={date}>{`${fmtDateTimeUTC(date)} (UTC)`}</RichTs>
               </span>{" "}
               {duration ? (
-                <span class="text-muted-foreground/70 font-mono text-xs">{duration}</span>
+                <span class="text-muted-foreground/70 font-sans text-xs">{duration}</span>
               ) : null}
             </div>
             <div
               data-slot="status-event-timeline-message"
-              class="text-muted-foreground py-1.5 font-mono text-sm"
+              class="text-muted-foreground py-1.5 font-sans text-sm"
             >
               {update.message.trim() === "" ? (
                 <span class="text-muted-foreground/70">-</span>
@@ -314,16 +314,16 @@ function MaintenanceEntry({ m, withDot = true }: { m: Maintenance; withDot?: boo
             <div data-slot="status-event-timeline-title" class="text-foreground text-sm font-medium">
               <span>{m.title}</span>{" "}
               <span class="text-muted-foreground/70">·</span>{" "}
-              <span class="text-muted-foreground font-mono text-xs">
+              <span class="text-muted-foreground font-sans text-xs">
                 <RichTs date={from}>{range.from}</RichTs>
                 {" - "}
                 <RichTs date={to}>{range.to}</RichTs>
               </span>{" "}
-              {dur ? <span class="text-muted-foreground/70 font-mono text-xs">(for {dur})</span> : null}
+              {dur ? <span class="text-muted-foreground/70 font-sans text-xs">(for {dur})</span> : null}
             </div>
             <div
               data-slot="status-event-timeline-message"
-              class="text-muted-foreground py-1.5 font-mono text-sm"
+              class="text-muted-foreground py-1.5 font-sans text-sm"
             >
               {m.message.trim() === "" ? (
                 <span class="text-muted-foreground/70">-</span>
@@ -438,7 +438,7 @@ function Banner({ status }: { status: Status }) {
       <StatusIcon status={status} size={28} inner={16} />
       <div class="flex flex-1 flex-wrap items-center justify-between gap-2">
         <div class="text-xl font-semibold">{bannerLabel[status]}</div>
-        <div class="text-muted-foreground decoration-muted-foreground/30 font-mono text-xs underline decoration-dashed underline-offset-4">
+        <div class="text-muted-foreground decoration-muted-foreground/30 font-sans text-xs underline decoration-dashed underline-offset-4">
           {fmtBannerTs(new Date())}
         </div>
       </div>
@@ -468,7 +468,7 @@ function BannerTabs({ events }: { events: OpenEvent[] }) {
               role="tab"
               data-tab={e.key}
               data-active={i === 0 ? "true" : "false"}
-              class={`text-foreground data-[active=true]:text-background dark:text-foreground dark:data-[active=true]:text-background focus-visible:border-ring focus-visible:outline-ring focus-visible:ring-ring/50 inline-flex h-9 flex-1 cursor-pointer items-center justify-center whitespace-nowrap border-none px-2 py-1 font-mono text-sm font-medium transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:outline-1 focus-visible:ring-inset ${TAB_BG[e.status]}`}
+              class={`text-foreground data-[active=true]:text-background dark:text-foreground dark:data-[active=true]:text-background focus-visible:border-ring focus-visible:outline-ring focus-visible:ring-ring/50 inline-flex h-9 flex-1 cursor-pointer items-center justify-center whitespace-nowrap border-none px-2 py-1 font-sans text-sm font-medium transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:outline-1 focus-visible:ring-inset ${TAB_BG[e.status]}`}
             >
               {e.name}
             </button>
@@ -537,7 +537,7 @@ function ComponentCard({ c, board }: { c: Component; board: StatusBoard }) {
         <div data-slot="status-component-header-left" class="flex items-center gap-2">
           <div
             data-slot="status-component-title"
-            class="text-foreground truncate font-mono text-base leading-5 font-medium"
+            class="text-foreground truncate font-sans text-base leading-5 font-medium"
           >
             {c.name}
           </div>
@@ -548,7 +548,7 @@ function ComponentCard({ c, board }: { c: Component; board: StatusBoard }) {
             <>
               <div
                 data-slot="status-component-uptime"
-                class="text-foreground/80 font-mono text-sm leading-none"
+                class="text-foreground/80 font-sans text-sm leading-none"
               >
                 {pct != null ? fmtPct(pct) : ""}
               </div>
@@ -557,7 +557,7 @@ function ComponentCard({ c, board }: { c: Component; board: StatusBoard }) {
           ) : (
             <div
               data-slot="status-component-status"
-              class={`font-mono text-sm leading-none ${statusText[status]}`}
+              class={`font-sans text-sm leading-none ${statusText[status]}`}
             >
               {componentLabel[status]}
             </div>
@@ -568,7 +568,7 @@ function ComponentCard({ c, board }: { c: Component; board: StatusBoard }) {
         <UptimeBar days={days} />
         <div
           data-slot="status-component-footer"
-          class="text-muted-foreground flex flex-row items-center justify-between font-mono text-xs leading-none"
+          class="text-muted-foreground flex flex-row items-center justify-between font-sans text-xs leading-none"
         >
           <div>{days.length > 0 ? `${days.length} day${days.length !== 1 ? "s" : ""} ago` : "-"}</div>
           <div>Today</div>
@@ -592,11 +592,11 @@ function Group({ item, board }: { item: GroupTracker; board: StatusBoard }) {
           data-slot="status-component-group-trigger"
           data-variant={status}
           aria-label={`Toggle ${item.g.name} status details`}
-          class="group/component flex w-full cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-3 py-2 font-mono font-medium [&::-webkit-details-marker]:hidden"
+          class="group/component flex w-full cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-3 py-2 font-sans font-medium [&::-webkit-details-marker]:hidden"
         >
           {item.g.name}
           <div class="flex items-center gap-2">
-            <span class={`font-mono text-sm leading-none ${statusText[status]}`}>
+            <span class={`font-sans text-sm leading-none ${statusText[status]}`}>
               {componentLabel[status]}
             </span>
             <StatusIcon status={status} size={12.5} />
@@ -644,11 +644,11 @@ function BlankEvents() {
     <div class="bg-muted/30 flex flex-col items-center justify-center gap-2.5 rounded-lg border px-3 py-8 text-center sm:px-8 sm:py-12">
       <div class="space-y-1">
         <div class="font-medium">No recent notifications</div>
-        <div class="text-muted-foreground font-mono text-sm">
+        <div class="text-muted-foreground font-sans text-sm">
           There have been no reports within the last 7 days.
         </div>
       </div>
-      <div class="border-border/70 text-muted-foreground hover:border-border hover:text-foreground mt-2 inline-flex items-center justify-center rounded-md border px-3 py-1.5 font-mono text-sm">
+      <div class="border-border/70 text-muted-foreground hover:border-border hover:text-foreground mt-2 inline-flex items-center justify-center rounded-md border px-3 py-1.5 font-sans text-sm">
         <a href="/events" class="text-inherit no-underline">
           View events history
         </a>

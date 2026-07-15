@@ -455,7 +455,7 @@ function EventRow({ e }: { e: DayEvent }) {
       </div>
       <div class="text-muted-foreground mt-1 text-xs">
         {formatDateRange(from, to)}{" "}
-        <span class="text-muted-foreground/70 ml-1.5 font-mono">{dur}</span>
+        <span class="text-muted-foreground/70 ml-1.5 font-sans">{dur}</span>
       </div>
     </div>
   );
@@ -525,7 +525,7 @@ function Bar({ day, index, edge }: { day: UptimeDay; index: number; edge: "first
                       />
                       <div class="text-sm">{requestStatusLabel[row.status]}</div>
                     </div>
-                    <div class="text-muted-foreground ml-auto font-mono text-xs tracking-tight">
+                    <div class="text-muted-foreground ml-auto font-sans text-xs tracking-tight">
                       {row.value}
                     </div>
                   </div>

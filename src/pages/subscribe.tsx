@@ -199,7 +199,7 @@ function BlankTitle({ children, class: cls }: { children: Child; class?: string 
 }
 
 function BlankDescription({ children }: { children: Child }) {
-  return <div class="text-muted-foreground font-mono text-sm">{children}</div>;
+  return <div class="text-muted-foreground font-sans text-sm">{children}</div>;
 }
 
 /** Outlined Button-as-link CTA (the empty-state "Go back" / "Manage" action). */
@@ -270,7 +270,7 @@ function NoComponentsBlank() {
   return (
     <div class="bg-muted/30 flex flex-col items-center justify-center gap-2.5 rounded-lg border px-4 py-2 text-center sm:px-8 sm:py-6">
       <div class="font-medium">No components to subscribe to</div>
-      <div class="text-muted-foreground font-mono text-sm">
+      <div class="text-muted-foreground font-sans text-sm">
         This status page has no components to subscribe to.
       </div>
     </div>

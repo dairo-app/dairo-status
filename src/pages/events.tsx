@@ -181,7 +181,7 @@ function TsHoverRow({
       ) : (
         <span class="text-muted-foreground">{label}</span>
       )}
-      <span class="flex items-center gap-1 truncate font-mono">
+      <span class="flex items-center gap-1 truncate font-sans">
         <span class="invisible group-hover/tsr:visible">
           <Icon path={COPY_ICON} size={12} />
         </span>
@@ -400,7 +400,7 @@ function ImpactLabel({ changes }: { changes: { name: string; impact: string }[] 
     <span class="group/impact relative inline-block">
       <button
         type="button"
-        class={`decoration-muted-foreground/30 hover:decoration-muted-foreground/60 font-mono text-xs font-medium underline decoration-dashed underline-offset-4 ${impactText[worst]}`}
+        class={`decoration-muted-foreground/30 hover:decoration-muted-foreground/60 font-sans text-xs font-medium underline decoration-dashed underline-offset-4 ${impactText[worst]}`}
       >
         {impactLabel[worst] ?? worst}
       </button>
@@ -408,7 +408,7 @@ function ImpactLabel({ changes }: { changes: { name: string; impact: string }[] 
         {changes.map((change) => (
           <span class="flex items-center justify-between gap-4 text-xs">
             <span class="truncate">{change.name}</span>
-            <span class={`shrink-0 font-mono ${impactText[change.impact] ?? ""}`}>
+            <span class={`shrink-0 font-sans ${impactText[change.impact] ?? ""}`}>
               {impactLabel[change.impact] ?? change.impact}
             </span>
           </span>
@@ -421,7 +421,7 @@ function ImpactLabel({ changes }: { changes: { name: string; impact: string }[] 
 /** The monospace message block (or a dash when empty). */
 function TimelineMessage({ message }: { message: string }) {
   return (
-    <div class="text-muted-foreground py-1.5 font-mono text-sm">
+    <div class="text-muted-foreground py-1.5 font-sans text-sm">
       {message.trim() === "" ? (
         <span class="text-muted-foreground/70">-</span>
       ) : (
@@ -469,11 +469,11 @@ function ReportUpdateRow({
                 </>
               ) : null}
               <span class="text-muted-foreground/70 mx-0.5">·</span>{" "}
-              <span class="text-muted-foreground font-mono text-xs">
+              <span class="text-muted-foreground font-sans text-xs">
                 <TimestampHover iso={update.date}>{fmtDateTime(update.date)}</TimestampHover>
               </span>{" "}
               {duration ? (
-                <span class="text-muted-foreground/70 font-mono text-xs">{duration}</span>
+                <span class="text-muted-foreground/70 font-sans text-xs">{duration}</span>
               ) : null}
             </div>
             <TimelineMessage message={update.message} />
@@ -535,13 +535,13 @@ function MaintenanceTimeline({ maintenance }: { maintenance: Maintenance }) {
             <div class="text-foreground text-sm font-medium">
               <span>{maintenance.title}</span>{" "}
               <span class="text-muted-foreground/70">·</span>{" "}
-              <span class="text-muted-foreground font-mono text-xs">
+              <span class="text-muted-foreground font-sans text-xs">
                 <TimestampHover iso={maintenance.startAt}>{from}</TimestampHover>
                 {" - "}
                 <TimestampHover iso={maintenance.endAt}>{to}</TimestampHover>
               </span>{" "}
               {duration ? (
-                <span class="text-muted-foreground/70 font-mono text-xs">{`(for ${duration})`}</span>
+                <span class="text-muted-foreground/70 font-sans text-xs">{`(for ${duration})`}</span>
               ) : null}
             </div>
             <TimelineMessage message={maintenance.message} />
@@ -586,7 +586,7 @@ function BlankEvents({ title, description }: { title: string; description: strin
     <div class="bg-muted/30 flex flex-col items-center justify-center gap-2.5 rounded-lg border px-3 py-8 text-center sm:px-8 sm:py-12">
       <div class="space-y-1">
         <div class="font-medium">{title}</div>
-        <div class="text-muted-foreground font-mono text-sm">{description}</div>
+        <div class="text-muted-foreground font-sans text-sm">{description}</div>
       </div>
     </div>
   );

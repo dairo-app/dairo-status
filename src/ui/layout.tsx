@@ -140,7 +140,7 @@ function Header({ page, active, env }: { page: Page; active?: "status" | "events
               {page.icon ? (
                 <img src={page.icon} alt={`${page.title} status page`} class="size-8" />
               ) : (
-                <div class="flex size-8 items-center justify-center font-mono">{initials(page.title)}</div>
+                <div class="flex size-8 items-center justify-center font-sans">{initials(page.title)}</div>
               )}
             </a>
           </div>
