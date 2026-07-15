@@ -46,27 +46,104 @@ function fmtDay(day: string): string {
   });
 }
 
-/** Minimum height (%) for a non-success segment, so a day with ANY failures is visibly
- *  marked rather than rendering a sub-pixel red sliver (1 error in 720 checks ≈ 0.14%). */
-const MIN_FAULT_HEIGHT = 14;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-/** Top-to-bottom segments for one day's bar (heights are percentages summing to 100).
- *  Proportional to request counts, but the error slice is floored so downtime is visible. */
-function daySegments(day: UptimeDay): { status: Status; height: number }[] {
-  if (day.total === 0) return [{ status: "empty", height: 100 }];
-  const errCount = Math.max(0, day.total - day.ok);
-  if (errCount === 0) return [{ status: "success", height: 100 }];
-  const errPct = Math.min(100, Math.max((errCount / day.total) * 100, MIN_FAULT_HEIGHT));
+/** Overlap (ms) of an event window with a given UTC day; an open event (to=null) runs to now. */
+function eventMsInDay(from: string | null, to: string | null, dayStr: string): number {
+  if (!from) return 0;
+  const dayStart = Date.parse(`${dayStr}T00:00:00Z`);
+  const dayEnd = dayStart + MS_PER_DAY - 1;
+  const start = Math.max(Date.parse(from), dayStart);
+  const end = Math.min(to ? Date.parse(to) : Date.now(), dayEnd);
+  return Math.max(0, end - start);
+}
+
+/** Summed overlap of a set of events within the day, capped at 24h (getTotalEventsDurationMs). */
+function totalEventMs(events: DayEvent[], dayStr: string): number {
+  let total = 0;
+  for (const ev of events) total += eventMsInDay(ev.from, ev.to, dayStr);
+  return Math.min(total, MS_PER_DAY);
+}
+
+/** The day's event-derived color (setDataByType's eventStatus): incidents → error, else the
+ *  worst active report color, else maintenance → info, else none. Report DayEvents already
+ *  carry their per-day color (floored to degraded/error). */
+function dayEventStatus(events: DayEvent[]): "error" | "degraded" | "info" | undefined {
+  if (events.some((e) => e.type === "incident")) return "error";
+  const reportColors = events.filter((e) => e.type === "report").map((e) => e.status);
+  if (reportColors.includes("error")) return "error";
+  if (reportColors.includes("degraded")) return "degraded";
+  if (events.some((e) => e.type === "maintenance")) return "info";
+  return undefined;
+}
+
+/** Downtime-only event day (createErrorOnlyBarData): the error slice takes its true proportion
+ *  of the day and the rest is operational green. */
+function errorOnlyBar(errorMs: number): { status: Status; height: number }[] {
+  const errHeight = (Math.min(errorMs, MS_PER_DAY) / MS_PER_DAY) * 100;
   return [
-    { status: "success", height: 100 - errPct },
-    { status: "error", height: errPct },
+    { status: "success", height: 100 - errHeight },
+    { status: "error", height: errHeight },
   ];
 }
 
-/** The day's request breakdown rows (StatusBarContent). Success + Error counts, in the
- *  original's request order; a no-data day yields a single empty row with a blank value. */
-function dayCard(day: UptimeDay): { status: Status; value: string }[] {
-  if (day.total === 0) return [{ status: "empty", value: "" }];
+/** Mixed event day (createProportionalBarData): downtime keeps its real share of the day;
+ *  maintenance/degraded "highlight" slices split the remaining (non-error) space. */
+function proportionalBar(
+  segments: { status: Status; count: number }[],
+): { status: Status; height: number }[] {
+  const errorMs = segments.filter((s) => s.status === "error").reduce((a, s) => a + s.count, 0);
+  const errHeight = (Math.min(errorMs, MS_PER_DAY) / MS_PER_DAY) * 100;
+  const remaining = Math.max(0, 100 - errHeight);
+  const highlight = segments.filter((s) => s.status !== "error");
+  const highlightTotal = highlight.reduce((a, s) => a + s.count, 0);
+  return segments.map((s) => {
+    if (s.status === "error") return { status: s.status, height: errHeight };
+    return {
+      status: s.status,
+      height: highlightTotal > 0 ? (s.count / highlightTotal) * remaining : remaining / highlight.length,
+    };
+  });
+}
+
+/** Top-to-bottom segments for one day's bar (heights are percentages). Faithful port of the
+ *  original setDataByType (barType "absolute"): a day with incidents/reports/maintenance is
+ *  painted from event DURATIONS (downtime at its true scale, maintenance/degraded as highlight
+ *  slices); an ordinary day is the proportional success/degraded/error split of the day's
+ *  request counts — no minimum floor, so downtime shows at its real size, exactly as before. */
+function daySegments(day: UptimeDay & { events?: DayEvent[] }): { status: Status; height: number }[] {
+  const events = day.events ?? [];
+
+  if (dayEventStatus(events)) {
+    const maintenances = events.filter((e) => e.type === "maintenance");
+    const degradedReports = events.filter((e) => e.type === "report" && e.status === "degraded");
+    const errorEvents = events.filter(
+      (e) => e.type === "incident" || (e.type === "report" && e.status === "error"),
+    );
+    const segs = [
+      { status: "info" as Status, count: totalEventMs(maintenances, day.day) },
+      { status: "degraded" as Status, count: totalEventMs(degradedReports, day.day) },
+      { status: "error" as Status, count: totalEventMs(errorEvents, day.day) },
+    ].filter((s) => s.count > 0);
+    if (segs.length === 1 && segs[0].status === "error") return errorOnlyBar(segs[0].count);
+    if (segs.length > 0) return proportionalBar(segs);
+  }
+
+  if (day.total === 0) return [{ status: "empty", height: 100 }];
+  const errCount = Math.max(0, day.total - day.ok);
+  const segs = [
+    { status: "success" as Status, count: day.ok },
+    { status: "error" as Status, count: errCount },
+  ].filter((s) => s.count > 0);
+  if (segs.length === 0) return [{ status: "success", height: 100 }];
+  return segs.map((s) => ({ status: s.status, height: (s.count / day.total) * 100 }));
+}
+
+/** The day's request breakdown rows (requests cardType): a "N reqs" row per non-zero status
+ *  bucket in success → error order; an empty day yields one row tinted by the day's event color
+ *  (or "No Data"). Mirrors createRequestEntries + entriesToRequestCardData. */
+function dayCard(day: UptimeDay & { events?: DayEvent[] }): { status: Status; value: string }[] {
+  if (day.total === 0) return [{ status: dayEventStatus(day.events ?? []) ?? "empty", value: "" }];
   const err = Math.max(0, day.total - day.ok);
   const rows: { status: Status; value: string }[] = [];
   if (day.ok > 0) rows.push({ status: "success", value: `${formatNumber(day.ok)} reqs` });
