@@ -33,12 +33,11 @@ function initials(title: string): string {
 // Runs before paint: applies stored/system theme so there's no flash.
 const THEME_BOOTSTRAP = `(function(){try{var t=localStorage.getItem('theme')||'system';var d=t==='dark'||(t==='system'&&matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})();`;
 
-// Theme setter, popover auto-close, timezone label, and a tiny segmented-tabs engine
+// Theme setter, popover auto-close, and a tiny segmented-tabs engine
 // (data-tabs > data-tab buttons + data-panel sections).
 const CLIENT_JS = `function dsSetTheme(t){try{localStorage.setItem('theme',t);var d=t==='dark'||(t==='system'&&matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}document.querySelectorAll('details[open]').forEach(function(el){el.open=false;});}
 document.addEventListener('click',function(e){document.querySelectorAll('details[open]').forEach(function(el){if(!el.contains(e.target))el.open=false;});});
-document.querySelectorAll('[data-tabs]').forEach(function(root){root.querySelectorAll('[data-tab]').forEach(function(btn){btn.addEventListener('click',function(){var t=btn.getAttribute('data-tab');root.querySelectorAll('[data-tab]').forEach(function(x){x.setAttribute('data-active',x.getAttribute('data-tab')===t?'true':'false');});root.querySelectorAll('[data-panel]').forEach(function(p){p.hidden=p.getAttribute('data-panel')!==t;});});});});
-try{var tz=Intl.DateTimeFormat().resolvedOptions().timeZone;var n=document.getElementById('ds-tz-name');if(n&&tz)n.textContent=tz;}catch(e){}`;
+document.querySelectorAll('[data-tabs]').forEach(function(root){root.querySelectorAll('[data-tab]').forEach(function(btn){btn.addEventListener('click',function(){var t=btn.getAttribute('data-tab');root.querySelectorAll('[data-tab]').forEach(function(x){x.setAttribute('data-active',x.getAttribute('data-tab')===t?'true':'false');});root.querySelectorAll('[data-panel]').forEach(function(p){p.hidden=p.getAttribute('data-panel')!==t;});});});});`;
 
 export function Layout({ env, page, title, description, active, children }: LayoutProps) {
   const pageTitle = title ? `${title} | Dairo Status` : `${page.title} | Status Page`;
@@ -124,7 +123,7 @@ function Header({ page, active, env }: { page: Page; active?: "status" | "events
   const home = page.homepageUrl || "/";
   const external = Boolean(page.homepageUrl);
   return (
-    <header data-slot="status-page-header" class="w-full border-b">
+    <header data-slot="status-page-header" class="bg-background sticky top-0 z-40 w-full border-b">
       <nav
         data-slot="status-page-header-content"
         class="mx-auto flex max-w-2xl items-center justify-between gap-3 px-3 py-2"
@@ -352,48 +351,7 @@ function CopyInput({ value }: { value: string }) {
 }
 
 // ── Footer ────────────────────────────────────────────────────────────────────────────
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const pad2 = (n: number) => (n < 10 ? "0" : "") + n;
-/** SSR fallback: format a date in UTC as "LLL dd, y HH:mm:ss"; the client script re-localizes. */
-function fmtUTC(d: Date): string {
-  if (Number.isNaN(d.getTime())) return "—";
-  return `${MONTHS[d.getUTCMonth()]} ${pad2(d.getUTCDate())}, ${d.getUTCFullYear()} ${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}:${pad2(d.getUTCSeconds())}`;
-}
-
-// Localizes the timestamp hover card (local time + timezone + relative) and reflects the
-// stored theme in the theme menu — additive chrome only; does not touch CLIENT_JS/bootstrap.
-function footerScript(ms: number): string {
-  return `(function(){try{var d=new Date(${ms});var M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];function p(n){return(n<10?'0':'')+n;}function f(mo,da,y,h,mi,s){return M[mo]+' '+p(da)+', '+y+' '+p(h)+':'+p(mi)+':'+p(s);}function t(id,x){var e=document.getElementById(id);if(e)e.textContent=x;}var tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';t('ds-ts-local',f(d.getMonth(),d.getDate(),d.getFullYear(),d.getHours(),d.getMinutes(),d.getSeconds()));t('ds-ts-tzlabel',tz);t('ds-ts-utc',f(d.getUTCMonth(),d.getUTCDate(),d.getUTCFullYear(),d.getUTCHours(),d.getUTCMinutes(),d.getUTCSeconds()));var s=Math.round((Date.now()-d.getTime())/1000),neg=s<0,a=Math.abs(s),U=[['year',31536000],['month',2592000],['day',86400],['hour',3600],['minute',60],['second',1]],r='now';for(var i=0;i<U.length;i++){var v=Math.floor(a/U[i][1]);if(v>=1||i===U.length-1){var w=v+' '+U[i][0]+(v!==1?'s':'');r=neg?'in '+w:w+' ago';break;}}t('ds-ts-rel',r);}catch(e){}
-window.dsThemeUI=function(v){try{['light','dark','system'].forEach(function(k){var ic=document.getElementById('ds-theme-icon-'+k);if(ic){ic.classList.toggle('text-foreground',k===v);ic.classList.toggle('text-muted-foreground',k!==v);}});var lap=document.getElementById('ds-theme-laptop'),res=document.getElementById('ds-theme-resolved');if(lap&&res){if(v==='system'){lap.classList.remove('hidden');res.classList.add('hidden');}else{lap.classList.add('hidden');res.classList.remove('hidden');}}}catch(e){}};
-try{window.dsThemeUI(localStorage.getItem('theme')||'system');}catch(e){}})();`;
-}
-
-/** One row of the timestamp hover card: muted label + mono value with a hover-visible copy icon. */
-function TsRow({ label, labelId, valueId, value }: { label: string; labelId?: string; valueId: string; value: string }) {
-  return (
-    <div
-      class="group flex items-center justify-between gap-4 text-sm"
-      onclick={`var v=this.querySelector('[data-ts-val]');if(v&&navigator.clipboard){navigator.clipboard.writeText(v.textContent);var s=this.querySelector('svg');if(s){var o=s.innerHTML;s.innerHTML='${CHECK_ICON}';setTimeout(function(){s.innerHTML=o;},1000);}}`}
-    >
-      <dt id={labelId} class="text-muted-foreground">
-        {label}
-      </dt>
-      <dd class="flex items-center gap-1 truncate font-mono">
-        <span class="invisible group-hover:visible">
-          <Icon path={COPY_ICON} size={12} />
-        </span>
-        <span id={valueId} data-ts-val>
-          {value}
-        </span>
-      </dd>
-    </div>
-  );
-}
-
-function Footer({ env: _env, page }: { env: Env; page: Page }) {
-  const updated = new Date(page.updatedAt);
-  const ms = updated.getTime();
-  const utc = fmtUTC(updated);
+function Footer({ env: _env, page: _page }: { env: Env; page: Page }) {
   return (
     <footer data-slot="status-page-footer" class="w-full border-t">
       <div
@@ -414,67 +372,28 @@ function Footer({ env: _env, page }: { env: Env; page: Page }) {
           </p>
         </div>
         <div data-slot="status-page-footer-actions" class="flex items-center gap-2">
-          {/* Timestamp hover card: local / UTC / relative rows revealed on hover. */}
-          <a class="group text-muted-foreground/70 relative mr-2 flex items-center gap-1.5">
-            <Icon path={ICONS.clock} size={12} />
-            <span id="ds-tz-name" class="font-mono text-xs">UTC</span>
-            <div class="bg-popover text-popover-foreground absolute right-0 bottom-full z-10 mb-1 hidden w-auto rounded-md border p-2 shadow-md outline-hidden group-hover:block">
-              <dl class="flex flex-col gap-1">
-                <TsRow labelId="ds-ts-tzlabel" label="UTC" valueId="ds-ts-local" value={utc} />
-                <TsRow label="UTC" valueId="ds-ts-utc" value={utc} />
-                <TsRow label="Relative" valueId="ds-ts-rel" value="—" />
-              </dl>
-            </div>
-          </a>
           <ThemeSwitcher />
         </div>
       </div>
-      <script>{raw(footerScript(ms))}</script>
     </footer>
   );
 }
 
 // ── Theme switcher ────────────────────────────────────────────────────────────────────
-/** Light / Dark / System menu (native <details>). The trigger shows the icon for the
- *  currently rendered mode (sun in light, moon in dark); items call dsSetTheme. */
+/** A single click-toggle (no menu): one click flips light ⇄ dark. The icon reflects the
+ *  currently rendered mode — sun in light (click → dark), moon in dark (click → light) —
+ *  via the `.dark` class the toggle sets, so it updates instantly with no re-render. */
 function ThemeSwitcher() {
-  const item =
-    "relative flex w-full cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0";
   return (
-    <details class="relative">
-      <summary
-        data-slot="status-theme-switcher"
-        class={`${BTN_BASE} ${BTN_GHOST} ${SIZE_ICON} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}
-      >
-        <span id="ds-theme-resolved" class="contents">
-          <Icon path={ICONS.sun} size={16} cls="dark:hidden" />
-          <Icon path={ICONS.moon} size={16} cls="hidden dark:block" />
-        </span>
-        <span id="ds-theme-laptop" class="hidden">
-          <Icon path={ICONS.laptop} size={16} />
-        </span>
-        <span class="sr-only">Toggle theme</span>
-      </summary>
-      <div class="bg-popover text-popover-foreground absolute right-0 bottom-9 z-50 min-w-[8rem] origin-bottom-right overflow-x-hidden overflow-y-auto rounded-md border p-1 shadow-md outline-hidden">
-        <button type="button" class={item} onclick="dsSetTheme('light');window.dsThemeUI&&dsThemeUI('light')">
-          <span>Light</span>
-          <span id="ds-theme-icon-light" class="text-muted-foreground ml-auto">
-            <Icon path={ICONS.sun} size={16} />
-          </span>
-        </button>
-        <button type="button" class={item} onclick="dsSetTheme('dark');window.dsThemeUI&&dsThemeUI('dark')">
-          <span>Dark</span>
-          <span id="ds-theme-icon-dark" class="text-muted-foreground ml-auto">
-            <Icon path={ICONS.moon} size={16} />
-          </span>
-        </button>
-        <button type="button" class={item} onclick="dsSetTheme('system');window.dsThemeUI&&dsThemeUI('system')">
-          <span>System</span>
-          <span id="ds-theme-icon-system" class="text-muted-foreground ml-auto">
-            <Icon path={ICONS.laptop} size={16} />
-          </span>
-        </button>
-      </div>
-    </details>
+    <button
+      type="button"
+      data-slot="status-theme-switcher"
+      onclick="dsSetTheme(document.documentElement.classList.contains('dark')?'light':'dark')"
+      class={`${BTN_BASE} ${BTN_GHOST} ${SIZE_ICON} cursor-pointer`}
+    >
+      <Icon path={ICONS.sun} size={16} cls="dark:hidden" />
+      <Icon path={ICONS.moon} size={16} cls="hidden dark:block" />
+      <span class="sr-only">Toggle theme</span>
+    </button>
   );
 }
