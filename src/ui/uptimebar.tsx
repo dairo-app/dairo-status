@@ -465,19 +465,17 @@ function Bar({ day, index, edge }: { day: UptimeDay; index: number; edge: "first
 
   return (
     <div
-      class="group focus-visible:ring-ring/50 relative flex h-full flex-1 cursor-pointer flex-col rounded-full outline-none focus-visible:ring-[2px] aria-pressed:opacity-80"
+      class="group focus-visible:ring-ring/50 relative flex h-full flex-1 cursor-pointer flex-col outline-none focus-visible:ring-[2px] aria-pressed:opacity-80"
       tabindex={0}
       role="button"
       data-slot="status-bar-item"
       aria-label={`Day ${index + 1} status`}
     >
       {/* Only the bar visuals dim on hover/focus; the portaled-equivalent card stays crisp. */}
-      <div class="flex h-full w-full flex-col overflow-hidden rounded-full group-hover:opacity-80 group-focus-visible:opacity-80">
-        {bar.map((segment, i) => (
+      <div class="flex h-full w-full flex-col overflow-hidden group-hover:opacity-80 group-focus-visible:opacity-80">
+        {bar.map((segment) => (
           <div
-            class={`w-full transition-all ${i === 0 ? "rounded-t-full" : ""} ${
-              i === bar.length - 1 ? "rounded-b-full" : ""
-            }`}
+            class="w-full transition-all"
             style={`height:${segment.height}%;background-color:${statusVar[segment.status]}`}
           />
         ))}
