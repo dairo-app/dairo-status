@@ -7,6 +7,7 @@ import type { Child } from "hono/jsx";
 import type { Env, Page } from "../types";
 import { loadTrackers } from "../data/db";
 import { Icon, ICONS } from "./status";
+import { Honeypot } from "./honeypot";
 
 type LayoutProps = {
   env: Env;
@@ -330,6 +331,7 @@ export async function GetUpdates({ env, page }: { env: Env; page: Page }) {
             <div class="flex flex-col gap-2 px-2 pt-2 pb-0">
               <div class="text-sm">Get email notifications whenever a report has been created or resolved</div>
               <form id="ds-email-form" method="post" action="/api/subscribe" class="flex flex-col gap-2">
+                <Honeypot />
                 <input type="email" name="email" required placeholder="subscribe@me.com" class={INPUT_CLASS} />
                 {/* interaction-only: invisible for normal visitors; the checkbox
                     materializes only when Cloudflare requires an interaction. */}

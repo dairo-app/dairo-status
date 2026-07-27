@@ -9,6 +9,9 @@ export type Env = {
   INGEST_TOKEN?: string;
   DAIRO_API_KEY?: string;
   DAIRO_STATUS_INBOX_ID?: string;
+  /** Signing secret for the Dairo webhook that feeds the suppression list (POST
+   *  /api/email-events). Shown once at webhook creation and never again. */
+  DAIRO_WEBHOOK_SECRET?: string;
   /** Cloudflare Turnstile keys guarding POST /api/subscribe (see security/guard.ts).
    *  Sitekey is public (rendered into the form); the secret is a Worker secret. */
   TURNSTILE_SITE_KEY?: string;

@@ -142,3 +142,32 @@ CREATE TABLE IF NOT EXISTS subscribe_rate_limits (
   window_start TEXT NOT NULL,
   count        INTEGER NOT NULL
 );
+
+-- Audit trail for POST /api/subscribe: one row per submission, whatever the outcome. This is
+-- forensics, not enforcement — the limits themselves live in subscribe_rate_limits above.
+-- See src/data/gate.ts and migration/0001_subscribe_gate.sql.
+CREATE TABLE IF NOT EXISTS subscribe_attempts (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  ip         TEXT NOT NULL DEFAULT 'unknown',  -- CF-Connecting-IP, or 'unknown'
+  email      TEXT NOT NULL DEFAULT '',
+  outcome    TEXT NOT NULL,                    -- sent | honeypot | captcha_failed | rate_limited
+                                               -- | global_limited | invalid_email
+                                               -- | already_subscribed | already_pending | suppressed
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_subscribe_attempts_ip ON subscribe_attempts (ip, created_at);
+CREATE INDEX IF NOT EXISTS idx_subscribe_attempts_created ON subscribe_attempts (created_at);
+
+-- Addresses this page must never mail again. Dairo creates suppressions from complaints only,
+-- NOT from bounces, and a bounced *pending* subscriber row was never marked — it expired after
+-- 7 days and the address became eligible for another confirmation send. Written by
+-- src/data/bounces.ts (the Dairo webhook receiver), read by src/email/notify.ts before every
+-- send. See migration/0002_subscribe_suppressions.sql.
+CREATE TABLE IF NOT EXISTS subscribe_suppressions (
+  email      TEXT PRIMARY KEY,   -- lowercased; compared exactly against the send recipient
+  reason     TEXT NOT NULL,      -- hard_bounce | complaint | abuse
+  detail     TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_subscribe_suppressions_reason
+  ON subscribe_suppressions (reason, created_at);
