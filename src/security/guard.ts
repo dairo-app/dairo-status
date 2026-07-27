@@ -13,8 +13,9 @@
  */
 import type { Env } from "../types";
 
-/** Per-IP cap: attempts per fixed hourly window. Humans re-try once or twice. */
-const IP_LIMIT = 3;
+/** Per-IP cap: attempts per fixed hourly window. Generous enough for a human who
+ *  fumbles the captcha or email a few times; fatal to a drip campaign. */
+const IP_LIMIT = 5;
 /** Global cap per hourly window — a circuit breaker far above organic volume
  *  (the whole pre-attack history saw ~2 signups per WEEK). */
 const GLOBAL_LIMIT = 20;

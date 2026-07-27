@@ -11,7 +11,7 @@ import type { Child } from "hono/jsx";
 
 import type { Env, Page } from "../types";
 import { Layout } from "../ui/layout";
-import { loadPage } from "../data/db";
+import { loadPage, loadTrackers, type MTracker, type TrackerComp } from "../data/db";
 import { sendVerification } from "../email/notify";
 import { Icon } from "../ui/status";
 import { checkSubscribeRateLimit, verifyTurnstile } from "../security/guard";
@@ -109,51 +109,6 @@ async function loadSubscriber(env: Env, token: string): Promise<SubRow | null> {
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
   };
-}
-
-// ── Component tracker graph (for the "subscribe to specific components" tree) ───────────
-type TrackerComp = { id: number; name: string };
-type MTracker =
-  | { type: "group"; order: number; groupId: number; groupName: string; components: TrackerComp[] }
-  | { type: "component"; order: number; component: TrackerComp };
-
-/** The page's top-level components + groups (each with its members), ordered like the board. */
-async function loadTrackers(env: Env, pageId: number): Promise<MTracker[]> {
-  const [compRows, groupRows] = await Promise.all([
-    env.DB.prepare(
-      "SELECT id, name, sort_order, group_id FROM components WHERE page_id = ? ORDER BY sort_order ASC, id ASC",
-    )
-      .bind(pageId)
-      .all<Record<string, unknown>>(),
-    env.DB.prepare(
-      "SELECT id, name, sort_order FROM component_groups WHERE page_id = ? ORDER BY sort_order ASC",
-    )
-      .bind(pageId)
-      .all<Record<string, unknown>>(),
-  ]);
-
-  const byGroup = new Map<number, TrackerComp[]>();
-  const items: MTracker[] = [];
-  for (const r of compRows.results ?? []) {
-    const comp: TrackerComp = { id: Number(r.id), name: String(r.name) };
-    const gid = r.group_id == null ? null : Number(r.group_id);
-    if (gid == null) items.push({ type: "component", order: Number(r.sort_order), component: comp });
-    else {
-      if (!byGroup.has(gid)) byGroup.set(gid, []);
-      byGroup.get(gid)!.push(comp);
-    }
-  }
-  for (const g of groupRows.results ?? []) {
-    const gid = Number(g.id);
-    items.push({
-      type: "group",
-      order: Number(g.sort_order),
-      groupId: gid,
-      groupName: String(g.name),
-      components: byGroup.get(gid) ?? [],
-    });
-  }
-  return items.sort((a, b) => a.order - b.order);
 }
 
 /** Parse the stored `component_ids` JSON into a lookup set (empty ⇒ whole-page subscription). */
@@ -352,66 +307,50 @@ function CheckInbox({ title, children }: { title: string; children: Child }) {
 }
 
 // ── 1. Subscribe (POST /api/subscribe) ─────────────────────────────────────────────────
-export async function handleSubscribe(c: Ctx): Promise<Response> {
-  const page = await loadPage(c.env);
-  if (!page) return c.notFound();
+type SubscribeOutcome = {
+  ok: boolean;
+  state: "rate_limited" | "captcha_failed" | "invalid_email" | "already" | "pending" | "sent";
+  status: 200 | 400 | 403 | 429;
+  title: string;
+  message: string;
+};
 
-  const wrap = (body: Child, status?: 403 | 429) =>
-    c.html(
-      <Layout env={c.env} page={page} title="Subscribe">
-        <Frame page={page}>{body}</Frame>
-      </Layout>,
-      status,
-    );
-
-  const form = await c.req.parseBody();
+/** Run guards + the double-opt-in flow, returning a renderable outcome. */
+async function subscribeOutcome(c: Ctx): Promise<SubscribeOutcome> {
+  const form = await c.req.parseBody({ all: true });
   const email = String(form.email ?? "").trim().toLowerCase();
 
   // Abuse guards (2026-07 subscription-bombing wave): every attempt consumes
   // rate-limit budget, then the Turnstile token is verified server-side.
   const ip = c.req.header("cf-connecting-ip") ?? "";
   if (!(await checkSubscribeRateLimit(c.env, ip))) {
-    return wrap(
-      <StatusBlank>
-        <BlankContent>
-          <BlankTitle class="text-destructive">Too many attempts</BlankTitle>
-          <BlankDescription>
-            Subscription requests are limited. Please wait an hour and try again.
-          </BlankDescription>
-          <BlankLink href="/">Go back</BlankLink>
-        </BlankContent>
-      </StatusBlank>,
-      429,
-    );
+    return {
+      ok: false,
+      state: "rate_limited",
+      status: 429,
+      title: "Too many attempts",
+      message: "Subscription requests are limited. Please wait an hour and try again.",
+    };
   }
   const turnstileToken = String(form["cf-turnstile-response"] ?? "");
   if (!(await verifyTurnstile(c.env, turnstileToken, ip))) {
-    return wrap(
-      <StatusBlank>
-        <BlankContent>
-          <BlankTitle class="text-destructive">We couldn't verify you're human</BlankTitle>
-          <BlankDescription>
-            The anti-bot check didn't pass. Please go back and try subscribing again.
-          </BlankDescription>
-          <BlankLink href="/">Go back</BlankLink>
-        </BlankContent>
-      </StatusBlank>,
-      403,
-    );
+    return {
+      ok: false,
+      state: "captcha_failed",
+      status: 403,
+      title: "We couldn't verify you're human",
+      message: "The anti-bot check didn't pass. Please try subscribing again.",
+    };
   }
 
   if (!isValidEmail(email)) {
-    return wrap(
-      <StatusBlank>
-        <BlankContent>
-          <BlankTitle class="text-destructive">That doesn't look like an email</BlankTitle>
-          <BlankDescription>
-            Please go back and enter a valid email address to subscribe to updates.
-          </BlankDescription>
-          <BlankLink href="/">Go back</BlankLink>
-        </BlankContent>
-      </StatusBlank>,
-    );
+    return {
+      ok: false,
+      state: "invalid_email",
+      status: 400,
+      title: "That doesn't look like an email",
+      message: "Please enter a valid email address to subscribe to updates.",
+    };
   }
 
   // Already an active subscriber → nothing to do.
@@ -421,18 +360,13 @@ export async function handleSubscribe(c: Ctx): Promise<Response> {
     .bind(email)
     .first();
   if (active) {
-    return wrap(
-      <StatusBlank>
-        <BlankContent>
-          <BlankTitle class="text-success">You're already subscribed</BlankTitle>
-          <BlankDescription>
-            {email} already gets an email whenever something changes. Every one of those emails has
-            an unsubscribe link if you want to stop.
-          </BlankDescription>
-          <BlankLink href="/">Go back</BlankLink>
-        </BlankContent>
-      </StatusBlank>,
-    );
+    return {
+      ok: true,
+      state: "already",
+      status: 200,
+      title: "You're already subscribed",
+      message: `${email} already gets an email whenever something changes. Every one of those emails has an unsubscribe link if you want to stop.`,
+    };
   }
 
   // A pending, unexpired confirmation is already out → don't send a second one.
@@ -442,13 +376,21 @@ export async function handleSubscribe(c: Ctx): Promise<Response> {
     .bind(email, nowIso())
     .first();
   if (pending) {
-    return wrap(
-      <CheckInbox title="Check your inbox!">
-        We already sent a confirmation link to {email}. Click it to finish subscribing — it can take
-        a minute to arrive, so remember to look in spam.
-      </CheckInbox>,
-    );
+    return {
+      ok: true,
+      state: "pending",
+      status: 200,
+      title: "Check your inbox!",
+      message: `We already sent a confirmation link to ${email}. Click it to finish subscribing — it can take a minute to arrive, so remember to look in spam.`,
+    };
   }
+
+  // Component scope from the popover picker: absent/empty ⇒ whole page.
+  const rawComponents = form.pageComponents;
+  const componentValues = rawComponents == null ? [] : Array.isArray(rawComponents) ? rawComponents : [rawComponents];
+  const componentIds = [
+    ...new Set(componentValues.map((v) => Number(v)).filter((n) => Number.isInteger(n) && n > 0)),
+  ];
 
   // New pending subscription: mint a token, store it, send the double opt-in email.
   const token = crypto.randomUUID();
@@ -456,18 +398,55 @@ export async function handleSubscribe(c: Ctx): Promise<Response> {
   const expires = new Date(Date.now() + 7 * 86400000).toISOString();
   await c.env.DB.prepare(
     `INSERT INTO subscribers (token, email, component_ids, expires_at, created_at, updated_at)
-     VALUES (?, ?, '[]', ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?)`,
   )
-    .bind(token, email, expires, now, now)
+    .bind(token, email, JSON.stringify(componentIds), expires, now, now)
     .run();
 
   await sendVerification(c.env, email, token);
 
-  return wrap(
-    <CheckInbox title="Check your inbox!">
-      We sent a confirmation link to {email}. Validate your email to receive updates and you are all
-      set — the link expires in 7 days. If it doesn't arrive, check your spam folder.
-    </CheckInbox>,
+  return {
+    ok: true,
+    state: "sent",
+    status: 200,
+    title: "Check your inbox!",
+    message: `We sent a confirmation link to ${email}. Validate your email to receive updates and you are all set — the link expires in 7 days. If it doesn't arrive, check your spam folder.`,
+  };
+}
+
+export async function handleSubscribe(c: Ctx): Promise<Response> {
+  const page = await loadPage(c.env);
+  if (!page) return c.notFound();
+
+  const outcome = await subscribeOutcome(c);
+
+  // The popover submits via fetch with `accept: application/json` and renders the
+  // outcome inline. The no-JS form falls back to the full result page below.
+  if ((c.req.header("accept") ?? "").includes("application/json")) {
+    return c.json(
+      { ok: outcome.ok, state: outcome.state, title: outcome.title, message: outcome.message },
+      outcome.status,
+    );
+  }
+
+  const isInbox = outcome.state === "pending" || outcome.state === "sent";
+  return c.html(
+    <Layout env={c.env} page={page} title="Subscribe">
+      <Frame page={page}>
+        {isInbox ? (
+          <CheckInbox title={outcome.title}>{outcome.message}</CheckInbox>
+        ) : (
+          <StatusBlank>
+            <BlankContent>
+              <BlankTitle class={outcome.ok ? "text-success" : "text-destructive"}>{outcome.title}</BlankTitle>
+              <BlankDescription>{outcome.message}</BlankDescription>
+              <BlankLink href="/">Go back</BlankLink>
+            </BlankContent>
+          </StatusBlank>
+        )}
+      </Frame>
+    </Layout>,
+    outcome.status,
   );
 }
 

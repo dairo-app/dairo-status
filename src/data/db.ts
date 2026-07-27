@@ -306,3 +306,49 @@ export async function loadBoard(env: Env): Promise<StatusBoard | null> {
 
   return { page, components, groups, reports, maintenances, uptime, overall };
 }
+
+// ── Subscription component picker ──────────────────────────────────────────────────────
+export type TrackerComp = { id: number; name: string };
+export type MTracker =
+  | { type: "group"; order: number; groupId: number; groupName: string; components: TrackerComp[] }
+  | { type: "component"; order: number; component: TrackerComp };
+
+/** The page's top-level components + groups (each with its members), ordered like the
+ *  board. Drives the component checkboxes in the Get-updates popover and on /manage. */
+export async function loadTrackers(env: Env, pageId: number): Promise<MTracker[]> {
+  const [compRows, groupRows] = await Promise.all([
+    env.DB.prepare(
+      "SELECT id, name, sort_order, group_id FROM components WHERE page_id = ? ORDER BY sort_order ASC, id ASC",
+    )
+      .bind(pageId)
+      .all<Record<string, unknown>>(),
+    env.DB.prepare(
+      "SELECT id, name, sort_order FROM component_groups WHERE page_id = ? ORDER BY sort_order ASC",
+    )
+      .bind(pageId)
+      .all<Record<string, unknown>>(),
+  ]);
+
+  const byGroup = new Map<number, TrackerComp[]>();
+  const items: MTracker[] = [];
+  for (const r of compRows.results ?? []) {
+    const comp: TrackerComp = { id: Number(r.id), name: String(r.name) };
+    const gid = r.group_id == null ? null : Number(r.group_id);
+    if (gid == null) items.push({ type: "component", order: Number(r.sort_order), component: comp });
+    else {
+      if (!byGroup.has(gid)) byGroup.set(gid, []);
+      byGroup.get(gid)!.push(comp);
+    }
+  }
+  for (const g of groupRows.results ?? []) {
+    const gid = Number(g.id);
+    items.push({
+      type: "group",
+      order: Number(g.sort_order),
+      groupId: gid,
+      groupName: String(g.name),
+      components: byGroup.get(gid) ?? [],
+    });
+  }
+  return items.sort((a, b) => a.order - b.order);
+}

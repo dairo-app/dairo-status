@@ -153,7 +153,7 @@ function RichTs({ date, children }: { date: Date; children: Child }) {
   return (
     <span data-rich-ts="" data-ts-ms={date.getTime()} class="group/ts relative inline-block">
       <span>{children}</span>
-      <div class="bg-popover text-popover-foreground absolute top-full left-0 z-50 mt-1 hidden w-auto rounded-md border p-2 shadow-md outline-hidden group-hover/ts:block">
+      <div class="bg-popover text-popover-foreground absolute top-full left-0 z-10 mt-1 hidden w-auto rounded-md border p-2 shadow-md outline-hidden group-hover/ts:block">
         <dl class="flex flex-col gap-1">
           <RichTsRow label="UTC" value={utc} tzLabel localVal />
           <RichTsRow label="UTC" value={utc} />
@@ -205,7 +205,7 @@ function ImpactLabel({ changes }: { changes: { name: string; impact: string }[] 
       >
         {impactLabel[worst] ?? worst}
       </button>
-      <span class="bg-popover text-popover-foreground pointer-events-none absolute top-full left-0 z-50 mt-1 hidden w-auto min-w-48 flex-col gap-1.5 border p-3 shadow-md group-hover/impact:flex">
+      <span class="bg-popover text-popover-foreground pointer-events-none absolute top-full left-0 z-10 mt-1 hidden w-auto min-w-48 flex-col gap-1.5 border p-3 shadow-md group-hover/impact:flex">
         {changes.map((change) => (
           <span class="flex items-center justify-between gap-4 text-xs">
             <span class="truncate">{change.name}</span>
@@ -510,7 +510,7 @@ function DescriptionInfo({ text }: { text: string }) {
       <button type="button" aria-label="Details" class="inline-flex rounded-full">
         <Icon path={ICONS.info} size={16} cls="text-muted-foreground" />
       </button>
-      <span class="bg-primary text-primary-foreground pointer-events-none absolute bottom-[calc(100%+6px)] left-1/2 z-30 hidden w-max max-w-[16rem] -translate-x-1/2 px-3 py-1.5 text-xs shadow-md group-hover/desc:block">
+      <span class="bg-primary text-primary-foreground pointer-events-none absolute bottom-[calc(100%+6px)] left-1/2 z-10 hidden w-max max-w-[16rem] -translate-x-1/2 px-3 py-1.5 text-xs shadow-md group-hover/desc:block">
         {text}
       </span>
     </span>

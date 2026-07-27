@@ -5,6 +5,7 @@
 import { raw } from "hono/html";
 import type { Child } from "hono/jsx";
 import type { Env, Page } from "../types";
+import { loadTrackers } from "../data/db";
 import { Icon, ICONS } from "./status";
 
 type LayoutProps = {
@@ -33,11 +34,27 @@ function initials(title: string): string {
 // Runs before paint: applies stored/system theme so there's no flash.
 const THEME_BOOTSTRAP = `(function(){try{var t=localStorage.getItem('theme')||'system';var d=t==='dark'||(t==='system'&&matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})();`;
 
-// Theme setter, popover auto-close, and a tiny segmented-tabs engine
-// (data-tabs > data-tab buttons + data-panel sections).
+// Theme setter, popover auto-close, a tiny segmented-tabs engine
+// (data-tabs > data-tab buttons + data-panel sections), and the subscribe form's
+// fetch submit (renders the JSON outcome inline in the popover instead of
+// navigating to a result page; the no-JS fallback still gets the full page).
 const CLIENT_JS = `function dsSetTheme(t){try{localStorage.setItem('theme',t);var d=t==='dark'||(t==='system'&&matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}document.querySelectorAll('details[open]').forEach(function(el){el.open=false;});}
 document.addEventListener('click',function(e){document.querySelectorAll('details[open]').forEach(function(el){if(!el.contains(e.target))el.open=false;});});
-document.querySelectorAll('[data-tabs]').forEach(function(root){root.querySelectorAll('[data-tab]').forEach(function(btn){btn.addEventListener('click',function(){var t=btn.getAttribute('data-tab');root.querySelectorAll('[data-tab]').forEach(function(x){x.setAttribute('data-active',x.getAttribute('data-tab')===t?'true':'false');});root.querySelectorAll('[data-panel]').forEach(function(p){p.hidden=p.getAttribute('data-panel')!==t;});});});});`;
+document.querySelectorAll('[data-tabs]').forEach(function(root){root.querySelectorAll('[data-tab]').forEach(function(btn){btn.addEventListener('click',function(){var t=btn.getAttribute('data-tab');root.querySelectorAll('[data-tab]').forEach(function(x){x.setAttribute('data-active',x.getAttribute('data-tab')===t?'true':'false');});root.querySelectorAll('[data-panel]').forEach(function(p){p.hidden=p.getAttribute('data-panel')!==t;});});});});
+(function(){var f=document.getElementById('ds-email-form');if(!f)return;
+var res=document.getElementById('ds-email-result');
+var btn=document.querySelector('button[form="ds-email-form"]');
+function show(ok,title,msg){if(!res)return;res.hidden=false;res.className='px-2 text-sm '+(ok?'text-success':'text-destructive');res.textContent=title?title+' \\u2014 '+msg:msg;}
+function idle(){if(btn){btn.disabled=false;btn.textContent=btn.getAttribute('data-label')||'Subscribe';}}
+f.addEventListener('submit',function(e){e.preventDefault();
+if(btn){if(!btn.getAttribute('data-label'))btn.setAttribute('data-label',btn.textContent);btn.disabled=true;btn.textContent='Subscribing\\u2026';}
+fetch('/api/subscribe',{method:'POST',body:new FormData(f),headers:{accept:'application/json'}})
+.then(function(r){return r.json();})
+.then(function(d){show(!!d.ok,d.title||'',d.message||'');
+if(d.ok){f.hidden=true;if(btn)btn.hidden=true;}else{idle();}
+if(window.turnstile){try{window.turnstile.reset();}catch(_){}}})
+.catch(function(){show(false,'','Something went wrong. Please try again.');idle();
+if(window.turnstile){try{window.turnstile.reset();}catch(_){}}});});})();`;
 
 export function Layout({ env, page, title, description, active, children }: LayoutProps) {
   const pageTitle = title ? `${title} | Dairo Status` : `${page.title} | Status Page`;
@@ -159,7 +176,7 @@ function Header({ page, active, env }: { page: Page; active?: "status" | "events
           class="flex min-w-[150px] items-center justify-end gap-2"
         >
           {page.contactUrl ? <GetInTouch href={page.contactUrl} /> : null}
-          <GetUpdates env={env} />
+          <GetUpdates env={env} page={page} />
           <NavMobile active={active} />
         </div>
       </nav>
@@ -242,9 +259,37 @@ function NavMobile({ active }: { active?: "status" | "events" }) {
 }
 
 // ── Get updates ───────────────────────────────────────────────────────────────────────
-/** The tabbed "Get updates" popover: Email (subscribe form), RSS, JSON. Native <details>
- *  trigger + the shared data-tabs engine for the panels. */
-export function GetUpdates({ env }: { env: Env }) {
+/** One popover component checkbox (name=pageComponents, value=id); `nested` indents
+ *  group members. Mirrors the shared square-checkbox style used across the page. */
+function PopoverComponentCheckbox({ comp, nested }: { comp: { id: number; name: string }; nested?: boolean }) {
+  const id = `gu-pc-${comp.id}`;
+  return (
+    <label for={id} class={`flex cursor-pointer items-center gap-2 text-sm leading-none font-medium select-none ${nested ? "pl-6" : ""}`}>
+      <span class="relative inline-flex size-4 shrink-0 items-center justify-center">
+        <input
+          id={id}
+          type="checkbox"
+          name="pageComponents"
+          value={String(comp.id)}
+          class="peer border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 checked:border-primary checked:bg-primary absolute inset-0 size-4 shrink-0 appearance-none rounded-none border bg-transparent shadow-xs outline-none transition-shadow focus-visible:ring-[3px]"
+        />
+        <Icon
+          path={CHECK_ICON}
+          size={14}
+          cls="text-primary-foreground pointer-events-none relative opacity-0 peer-checked:opacity-100"
+        />
+      </span>
+      {comp.name}
+    </label>
+  );
+}
+
+/** The tabbed "Get updates" popover: Email (subscribe form + component picker), Slack, RSS,
+ *  JSON. Native <details> trigger + the shared data-tabs engine for the panels. Async: it
+ *  loads the component tree from D1 so "subscribe to specific components" offers the real
+ *  checkboxes (the selection is stored on the pending subscription at POST time). */
+export async function GetUpdates({ env, page }: { env: Env; page: Page }) {
+  const trackers = await loadTrackers(env, page.id);
   const rssUrl = `${env.PUBLIC_URL}/feed/rss`;
   const atomUrl = `${env.PUBLIC_URL}/feed/atom`;
   const jsonUrl = `${env.PUBLIC_URL}/feed/json`;
@@ -297,23 +342,49 @@ export function GetUpdates({ env }: { env: Env }) {
                     data-appearance="interaction-only"
                   ></div>
                 ) : null}
-                <label class="flex items-center gap-2 text-sm font-medium leading-none select-none">
-                  <span class="relative inline-flex size-4 shrink-0 items-center justify-center">
-                    <input
-                      type="checkbox"
-                      name="subscribeComponents"
-                      class="peer border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 checked:border-primary checked:bg-primary absolute inset-0 size-4 shrink-0 appearance-none rounded-none border bg-transparent shadow-xs outline-none transition-shadow focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
-                    />
-                    <Icon
-                      path={CHECK_ICON}
-                      size={14}
-                      cls="text-primary-foreground pointer-events-none relative opacity-0 peer-checked:opacity-100"
-                    />
-                  </span>
-                  Subscribe to specific components
-                </label>
+                {/* "Specific components" reveal: the open state mirrors onto the square
+                    checkbox; the tree submits real pageComponents values with the form.
+                    Nothing checked (or closed) ⇒ whole-page subscription. */}
+                <details class="group/comps flex flex-col gap-2">
+                  <summary class="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                    <span class="flex items-center gap-2 text-sm leading-none font-medium select-none">
+                      <span
+                        data-slot="checkbox"
+                        class="border-input group-open/comps:border-primary group-open/comps:bg-primary group-open/comps:text-primary-foreground dark:bg-input/30 inline-flex size-4 shrink-0 items-center justify-center rounded-none border shadow-xs"
+                      >
+                        <span class="hidden items-center justify-center text-current group-open/comps:flex">
+                          <Icon path={CHECK_ICON} size={14} cls="size-3.5" />
+                        </span>
+                      </span>
+                      Subscribe to specific components
+                    </span>
+                  </summary>
+                  <div class="flex max-h-44 flex-col gap-2 overflow-y-auto pt-2 pl-1">
+                    {trackers.length === 0 ? (
+                      <div class="text-muted-foreground text-sm">This page has no components.</div>
+                    ) : (
+                      trackers.map((tracker) =>
+                        tracker.type === "group" ? (
+                          <div class="flex flex-col gap-2">
+                            <div class="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                              {tracker.groupName}
+                            </div>
+                            {tracker.components.map((comp) => (
+                              <PopoverComponentCheckbox comp={comp} nested />
+                            ))}
+                          </div>
+                        ) : (
+                          <PopoverComponentCheckbox comp={tracker.component} />
+                        ),
+                      )
+                    )}
+                  </div>
+                </details>
               </form>
             </div>
+            {/* Inline outcome slot: the fetch submit writes success/error feedback here
+                so the reader never leaves the popover. */}
+            <div id="ds-email-result" hidden class="px-2 text-sm"></div>
             <div class="bg-border h-px w-full shrink-0" />
             <div class="px-2 pb-2">
               <button

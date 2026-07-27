@@ -367,7 +367,7 @@ function TitleCheck() {
         </div>
         <span
           role="tooltip"
-          class="bg-primary text-primary-foreground pointer-events-none absolute bottom-full left-1/2 z-50 mb-1 hidden w-fit -translate-x-1/2 rounded-md px-3 py-1.5 text-xs text-balance whitespace-nowrap group-hover:block"
+          class="bg-primary text-primary-foreground pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden w-fit -translate-x-1/2 rounded-md px-3 py-1.5 text-xs text-balance whitespace-nowrap group-hover:block"
         >
           Report resolved
         </span>
@@ -404,7 +404,7 @@ function ImpactLabel({ changes }: { changes: { name: string; impact: string }[] 
       >
         {impactLabel[worst] ?? worst}
       </button>
-      <span class="bg-popover text-popover-foreground pointer-events-none absolute top-full left-0 z-50 mt-1 hidden w-auto min-w-48 flex-col gap-1.5 border p-3 shadow-md group-hover/impact:flex">
+      <span class="bg-popover text-popover-foreground pointer-events-none absolute top-full left-0 z-10 mt-1 hidden w-auto min-w-48 flex-col gap-1.5 border p-3 shadow-md group-hover/impact:flex">
         {changes.map((change) => (
           <span class="flex items-center justify-between gap-4 text-xs">
             <span class="truncate">{change.name}</span>

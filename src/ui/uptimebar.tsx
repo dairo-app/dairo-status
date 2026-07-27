@@ -508,7 +508,7 @@ function Bar({ day, index, edge }: { day: UptimeDay; index: number; edge: "first
       {/* CSS-only hover card (side top), scoped to THIS bar's named group so hovering one bar
           never reveals its siblings' cards. Fades/zooms/slides in like the original. */}
       <div
-        class={`pointer-events-none absolute bottom-[calc(100%+4px)] ${cardPosition(edge)} z-50 hidden w-auto min-w-40 border bg-popover p-0 text-popover-foreground shadow-md group-hover/bar:pointer-events-auto group-hover/bar:block group-focus-within/bar:pointer-events-auto group-focus-within/bar:block`}
+        class={`pointer-events-none absolute bottom-[calc(100%+4px)] ${cardPosition(edge)} z-10 hidden w-auto min-w-40 border bg-popover p-0 text-popover-foreground shadow-md group-hover/bar:pointer-events-auto group-hover/bar:block group-focus-within/bar:pointer-events-auto group-focus-within/bar:block`}
       >
         <div data-slot="status-bar-card" class="font-sans">
           <div class="p-2 text-xs">{fmtDay(day.day)}</div>
