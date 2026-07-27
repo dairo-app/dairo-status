@@ -14,6 +14,7 @@ import { Layout } from "../ui/layout";
 import { loadPage } from "../data/db";
 import { sendVerification } from "../email/notify";
 import { Icon } from "../ui/status";
+import { checkSubscribeRateLimit, verifyTurnstile } from "../security/guard";
 
 type Ctx = Context<{ Bindings: Env }>;
 
@@ -305,22 +306,27 @@ function ComponentTree({ trackers, selected }: { trackers: MTracker[]; selected:
 }
 
 /** A compact re-subscribe form — styled to match the header's "Get updates" email tab. */
-function MiniSubscribe() {
+function MiniSubscribe({ env }: { env: Env }) {
   return (
-    <form method="post" action="/api/subscribe" class="flex w-full flex-col gap-2 sm:flex-row">
-      <input
-        type="email"
-        name="email"
-        required
-        placeholder="subscribe@me.com"
-        class="border-input bg-background focus:ring-ring w-full border px-2 py-1.5 text-sm outline-none focus:ring-1 sm:flex-1"
-      />
-      <button
-        type="submit"
-        class="bg-primary text-primary-foreground h-8 shrink-0 px-3 text-sm font-medium hover:opacity-90"
-      >
-        Subscribe
-      </button>
+    <form method="post" action="/api/subscribe" class="flex w-full flex-col gap-2">
+      <div class="flex w-full flex-col gap-2 sm:flex-row">
+        <input
+          type="email"
+          name="email"
+          required
+          placeholder="subscribe@me.com"
+          class="border-input bg-background focus:ring-ring w-full border px-2 py-1.5 text-sm outline-none focus:ring-1 sm:flex-1"
+        />
+        <button
+          type="submit"
+          class="bg-primary text-primary-foreground h-8 shrink-0 px-3 text-sm font-medium hover:opacity-90"
+        >
+          Subscribe
+        </button>
+      </div>
+      {env.TURNSTILE_SITE_KEY ? (
+        <div class="cf-turnstile" data-sitekey={env.TURNSTILE_SITE_KEY} data-theme="auto" data-size="flexible"></div>
+      ) : null}
     </form>
   );
 }
@@ -344,15 +350,49 @@ export async function handleSubscribe(c: Ctx): Promise<Response> {
   const page = await loadPage(c.env);
   if (!page) return c.notFound();
 
-  const wrap = (body: Child) =>
+  const wrap = (body: Child, status?: 403 | 429) =>
     c.html(
       <Layout env={c.env} page={page} title="Subscribe">
         <Frame page={page}>{body}</Frame>
       </Layout>,
+      status,
     );
 
   const form = await c.req.parseBody();
   const email = String(form.email ?? "").trim().toLowerCase();
+
+  // Abuse guards (2026-07 subscription-bombing wave): every attempt consumes
+  // rate-limit budget, then the Turnstile token is verified server-side.
+  const ip = c.req.header("cf-connecting-ip") ?? "";
+  if (!(await checkSubscribeRateLimit(c.env, ip))) {
+    return wrap(
+      <StatusBlank>
+        <BlankContent>
+          <BlankTitle class="text-destructive">Too many attempts</BlankTitle>
+          <BlankDescription>
+            Subscription requests are limited. Please wait an hour and try again.
+          </BlankDescription>
+          <BlankLink href="/">Go back</BlankLink>
+        </BlankContent>
+      </StatusBlank>,
+      429,
+    );
+  }
+  const turnstileToken = String(form["cf-turnstile-response"] ?? "");
+  if (!(await verifyTurnstile(c.env, turnstileToken, ip))) {
+    return wrap(
+      <StatusBlank>
+        <BlankContent>
+          <BlankTitle class="text-destructive">We couldn't verify you're human</BlankTitle>
+          <BlankDescription>
+            The anti-bot check didn't pass. Please go back and try subscribing again.
+          </BlankDescription>
+          <BlankLink href="/">Go back</BlankLink>
+        </BlankContent>
+      </StatusBlank>,
+      403,
+    );
+  }
 
   if (!isValidEmail(email)) {
     return wrap(
@@ -455,7 +495,7 @@ export async function VerifyPage({ env, token }: { env: Env; token: string }) {
           <BlankDescription>
             You unsubscribed this address. Subscribe again to start getting updates.
           </BlankDescription>
-          <MiniSubscribe />
+          <MiniSubscribe env={env} />
         </BlankContent>
       </StatusBlank>,
     );
@@ -488,21 +528,73 @@ export async function VerifyPage({ env, token }: { env: Env; token: string }) {
           <BlankDescription>
             Confirmation links are valid for 7 days. Subscribe again to get a fresh one.
           </BlankDescription>
-          <MiniSubscribe />
+          <MiniSubscribe env={env} />
         </BlankContent>
       </StatusBlank>,
     );
   }
 
-  // Confirm: activate the subscription and clear the expiry.
+  // Valid, pending confirmation. Deliberately do NOT confirm on GET: corporate
+  // mail-security gateways prefetch every link in an email, and during the
+  // 2026-07 bot wave those scanner fetches "confirmed" dozens of strangers.
+  // Consent requires the explicit button POST below — scanners don't submit forms.
+  return frame(
+    <StatusBlank>
+      <BlankContent>
+        <BlankTitle>Confirm your subscription</BlankTitle>
+        <BlankDescription>
+          Click the button to start receiving status updates at {maskEmail(sub.email)}.
+        </BlankDescription>
+        <div class="flex justify-center gap-2">
+          <BlankLink href="/">Cancel</BlankLink>
+          <form method="post" action={`/verify/${sub.token}`}>
+            <button type="submit" class={btn("default", "sm")}>
+              Confirm subscription
+            </button>
+          </form>
+        </div>
+      </BlankContent>
+    </StatusBlank>,
+  );
+}
+
+/** POST /verify/:token — the explicit consent click. Re-validates the same states as the
+ *  GET view, then activates the subscription. */
+export async function handleVerifyConfirm(c: Ctx): Promise<Response> {
+  const page = await loadPage(c.env);
+  if (!page) return c.notFound();
+
+  const token = c.req.param("token") ?? "";
+  const sub = await loadSubscriber(c.env, token);
+
+  const wrap = (body: Child) =>
+    c.html(
+      <Layout env={c.env} page={page} title="Confirm subscription">
+        <Frame page={page}>{body}</Frame>
+      </Layout>,
+    );
+
+  // Any state where confirming is impossible → render the same explanatory view
+  // the GET path shows (invalid / cancelled / already-confirmed / expired).
+  // VerifyPage output already carries its own <Frame>, so wrap it in Layout only.
+  const confirmable =
+    sub && !sub.unsubscribedAt && !sub.acceptedAt && !(sub.expiresAt && Date.parse(sub.expiresAt) < Date.now());
+  if (!confirmable) {
+    return c.html(
+      <Layout env={c.env} page={page} title="Confirm subscription">
+        {await VerifyPage({ env: c.env, token })}
+      </Layout>,
+    );
+  }
+
   const now = nowIso();
-  await env.DB.prepare(
+  await c.env.DB.prepare(
     "UPDATE subscribers SET accepted_at = ?, expires_at = NULL, updated_at = ? WHERE token = ?",
   )
     .bind(now, now, sub.token)
     .run();
 
-  return frame(
+  return wrap(
     <StatusBlank>
       <BlankContent>
         <BlankTitle class="text-success">All set to receive updates to {sub.email}!</BlankTitle>
@@ -742,7 +834,7 @@ export async function handleUnsubscribe(c: Ctx): Promise<Response> {
           {maskEmail(sub.email)} won't get any more email notifications from {page.title}. Changed
           your mind? Subscribe again below.
         </BlankDescription>
-        <MiniSubscribe />
+        <MiniSubscribe env={c.env} />
       </BlankContent>
     </StatusBlank>,
   );

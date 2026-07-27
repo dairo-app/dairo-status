@@ -134,3 +134,11 @@ CREATE TABLE IF NOT EXISTS subscribers (
   updated_at      TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_subscribers_email ON subscribers (email);
+
+-- Fixed-window rate-limit counters for POST /api/subscribe (security/guard.ts).
+-- One row per key ("ip:<addr>" or "global"); the window resets in place.
+CREATE TABLE IF NOT EXISTS subscribe_rate_limits (
+  key          TEXT PRIMARY KEY,
+  window_start TEXT NOT NULL,
+  count        INTEGER NOT NULL
+);

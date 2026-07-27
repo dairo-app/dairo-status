@@ -60,6 +60,11 @@ export function Layout({ env, page, title, description, active, children }: Layo
         <link rel="alternate" type="application/rss+xml" title="Dairo Status" href={`${env.PUBLIC_URL}/feed/rss`} />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link rel="stylesheet" href="/styles.css" />
+        {/* Turnstile guards the subscribe form (bot signups were burning sender
+            reputation); the script only loads when the widget is configured. */}
+        {env.TURNSTILE_SITE_KEY ? (
+          <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+        ) : null}
         <script>{raw(THEME_BOOTSTRAP)}</script>
       </head>
       <body class="bg-background text-foreground font-sans antialiased">
@@ -281,6 +286,9 @@ export function GetUpdates({ env }: { env: Env }) {
               <div class="text-sm">Get email notifications whenever a report has been created or resolved</div>
               <form id="ds-email-form" method="post" action="/api/subscribe" class="flex flex-col gap-2">
                 <input type="email" name="email" required placeholder="subscribe@me.com" class={INPUT_CLASS} />
+                {env.TURNSTILE_SITE_KEY ? (
+                  <div class="cf-turnstile" data-sitekey={env.TURNSTILE_SITE_KEY} data-theme="auto" data-size="flexible"></div>
+                ) : null}
                 <label class="flex items-center gap-2 text-sm font-medium leading-none select-none">
                   <span class="relative inline-flex size-4 shrink-0 items-center justify-center">
                     <input

@@ -9,6 +9,10 @@ export type Env = {
   INGEST_TOKEN?: string;
   DAIRO_API_KEY?: string;
   DAIRO_STATUS_INBOX_ID?: string;
+  /** Cloudflare Turnstile keys guarding POST /api/subscribe (see security/guard.ts).
+   *  Sitekey is public (rendered into the form); the secret is a Worker secret. */
+  TURNSTILE_SITE_KEY?: string;
+  TURNSTILE_SECRET_KEY?: string;
   /** Service binding to the Dairo edge worker — the in-network path to api.dairo.app
    *  that dodges the Cloudflare 1014 cross-user-CNAME ban on direct Worker subrequests. */
   DAIRO_EDGE?: Fetcher;

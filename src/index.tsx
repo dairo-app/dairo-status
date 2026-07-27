@@ -24,6 +24,7 @@ import {
   handleManage,
   UnsubscribePage,
   handleUnsubscribe,
+  handleVerifyConfirm,
   VerifyPage,
 } from "./pages/subscribe";
 
@@ -126,6 +127,9 @@ app.get("/verify/:token", async (c) => {
     </Layout>,
   );
 });
+// Confirmation is an explicit POST (button click): email-security link scanners
+// GET every URL in a message, and a GET-confirm let them fake double opt-in.
+app.post("/verify/:token", handleVerifyConfirm);
 
 app.get("/manage/:token", async (c) => {
   const page = await loadPage(c.env);
