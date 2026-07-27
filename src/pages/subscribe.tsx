@@ -325,7 +325,13 @@ function MiniSubscribe({ env }: { env: Env }) {
         </button>
       </div>
       {env.TURNSTILE_SITE_KEY ? (
-        <div class="cf-turnstile" data-sitekey={env.TURNSTILE_SITE_KEY} data-theme="auto" data-size="flexible"></div>
+        <div
+          class="cf-turnstile"
+          data-sitekey={env.TURNSTILE_SITE_KEY}
+          data-theme="auto"
+          data-size="flexible"
+          data-appearance="interaction-only"
+        ></div>
       ) : null}
     </form>
   );

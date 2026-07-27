@@ -286,8 +286,16 @@ export function GetUpdates({ env }: { env: Env }) {
               <div class="text-sm">Get email notifications whenever a report has been created or resolved</div>
               <form id="ds-email-form" method="post" action="/api/subscribe" class="flex flex-col gap-2">
                 <input type="email" name="email" required placeholder="subscribe@me.com" class={INPUT_CLASS} />
+                {/* interaction-only: invisible for normal visitors; the checkbox
+                    materializes only when Cloudflare requires an interaction. */}
                 {env.TURNSTILE_SITE_KEY ? (
-                  <div class="cf-turnstile" data-sitekey={env.TURNSTILE_SITE_KEY} data-theme="auto" data-size="flexible"></div>
+                  <div
+                    class="cf-turnstile"
+                    data-sitekey={env.TURNSTILE_SITE_KEY}
+                    data-theme="auto"
+                    data-size="flexible"
+                    data-appearance="interaction-only"
+                  ></div>
                 ) : null}
                 <label class="flex items-center gap-2 text-sm font-medium leading-none select-none">
                   <span class="relative inline-flex size-4 shrink-0 items-center justify-center">
