@@ -1,0 +1,13 @@
+# Cloudflare Worker (Hono, server-side JSX) — no bundler output; the only
+# real build step is compiling the Tailwind v4 stylesheet wrangler serves
+# as a static asset. `wrangler dev`/`deploy` run the TS entry directly.
+name      = "dairo-status"
+image     = "universal"
+build     = "npm run build"
+artifacts = "public/styles.css"
+dev       = "npm run dev"
+# No "start" script in package.json — serve the already-built CSS without
+# re-running the css step `npm run dev` does.
+start     = "npx wrangler dev"
+port      = 8787
+health    = "/"
