@@ -15,14 +15,14 @@
     "db:remote": "wrangler d1 execute dairo-status --remote --file=./db/schema.sql"
   },
   "dependencies": {
-    "geist": "^1.7.2",
-    "hono": "^4.6.14"
+    "geist": "1.7.2",
+    "hono": "4.12.30"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20241218.0",
-    "@tailwindcss/cli": "^4.0.0",
-    "tailwindcss": "^4.0.0",
-    "typescript": "^7.0.2",
-    "wrangler": "^4.0.0"
+    "@cloudflare/workers-types": "4.20260702.1",
+    "@tailwindcss/cli": "4.3.2",
+    "tailwindcss": "4.3.2",
+    "typescript": "7.0.2",
+    "wrangler": "4.114.0"
   }
 }
