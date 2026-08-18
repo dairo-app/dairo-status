@@ -8,13 +8,61 @@ function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+/** Is this address on the never-mail list (`subscribe_suppressions`)?
+ *
+ *  Fails **closed** — a DB error counts as suppressed and the send is skipped. Failing open on
+ *  a rate limit costs one extra email; failing open here means mailing an address we already
+ *  know is dead, which is precisely the reputation damage the suppression list exists to stop.
+ *  The page renders entirely from D1, so a D1 outage has already taken the site down; this is
+ *  never the only broken thing.
+ *
+ *  Exported because the subscribe handler runs the same check earlier, to avoid minting a
+ *  doomed pending row that would then block the address for 7 days. This copy is the backstop
+ *  at the wire, and it is the only one that covers the incident fan-out in `notifySubscribers`
+ *  — a confirmed subscriber whose mailbox dies later is suppressed by the webhook, but their
+ *  `subscribers` row can still be live. */
+export async function isSuppressed(env: Env, email: string): Promise<boolean> {
+  try {
+    const row = await env.DB.prepare(
+      "SELECT 1 AS hit FROM subscribe_suppressions WHERE email = ? LIMIT 1",
+    )
+      .bind(email.trim().toLowerCase())
+      .first();
+    return row !== null;
+  } catch (err) {
+    console.error(
+      "suppression check failed, failing closed (not sending)",
+      err instanceof Error ? err.message : String(err),
+    );
+    return true;
+  }
+}
+
 /** The single transport — dogfooded through Dairo's own send API, from the status@dairo.app
  *  inbox (DAIRO_STATUS_INBOX_ID). Everything routes through here so it's swappable in one place. */
 async function sendEmail(env: Env, msg: { to: string; subject: string; html: string }): Promise<void> {
-  if (!env.DAIRO_API_KEY || !env.DAIRO_STATUS_INBOX_ID) {
-    console.error("email skipped — DAIRO_API_KEY / DAIRO_STATUS_INBOX_ID not set");
+  // The last gate before the wire. Checked here, at the one transport, so it covers both
+  // verification mail and incident fan-out — and so nothing can route around it by taking a
+  // different path to the API. An address that has hard-bounced never gets another send,
+  // which is what stops the 7-day expire-and-retry loop (LUK-32/LUK-42).
+  //
+  // Deliberately checked BEFORE the credential check: "we must not mail this address" is a
+  // decision about the recipient, not about whether we happen to be configured to send. Doing
+  // it in this order also means a credential-less `wrangler dev` still exercises the
+  // suppression path, which is what makes it testable without sending real mail.
+  if (await isSuppressed(env, msg.to)) {
+    console.warn(`email suppressed — ${msg.to} is on the never-mail list`);
     return;
   }
+
+  if (!env.DAIRO_API_KEY || !env.DAIRO_STATUS_INBOX_ID) {
+    // The recipient is named so this line identifies *which* mail was dropped — needed in
+    // production triage, and it is what verify-gate.sh counts to prove a send did or didn't
+    // happen for a specific address.
+    console.error(`email skipped — DAIRO_API_KEY / DAIRO_STATUS_INBOX_ID not set (to=${msg.to})`);
+    return;
+  }
+
   const endpoint = "https://api.dairo.app/v1/messages";
   const init: RequestInit = {
     method: "POST",

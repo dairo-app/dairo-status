@@ -12,9 +12,11 @@ import type { Child } from "hono/jsx";
 import type { Env, Page } from "../types";
 import { Layout } from "../ui/layout";
 import { loadPage, loadTrackers, type MTracker, type TrackerComp } from "../data/db";
-import { sendVerification } from "../email/notify";
+import { isSuppressed, sendVerification } from "../email/notify";
 import { Icon } from "../ui/status";
-import { checkSubscribeRateLimit, verifyTurnstile } from "../security/guard";
+import { checkSubscribeRateLimit, reserveGlobalSend, verifyTurnstile } from "../security/guard";
+import { HONEYPOT_FIELD, clientIp, recordAttempt } from "../data/gate";
+import { Honeypot } from "../ui/honeypot";
 
 type Ctx = Context<{ Bindings: Env }>;
 
@@ -264,6 +266,7 @@ function ComponentTree({ trackers, selected }: { trackers: MTracker[]; selected:
 function MiniSubscribe({ env }: { env: Env }) {
   return (
     <form method="post" action="/api/subscribe" class="flex w-full flex-col gap-2">
+      <Honeypot />
       <div class="flex w-full flex-col gap-2 sm:flex-row">
         <input
           type="email"
@@ -315,15 +318,49 @@ type SubscribeOutcome = {
   message: string;
 };
 
-/** Run guards + the double-opt-in flow, returning a renderable outcome. */
+/** Run guards + the double-opt-in flow, returning a renderable outcome.
+ *
+ *  Order matters and is not arbitrary — cheapest and most certain first:
+ *
+ *    1. honeypot            free, no subrequest, no false positives. Silently succeeds.
+ *    2. per-IP cap          one D1 write, caller-keyed (../security/guard.ts).
+ *    3. Turnstile           one subrequest to Cloudflare; the load-bearing control.
+ *    4. email validity      cheap, and no point spending anything below on a non-address.
+ *    5. suppression list    never mail an address we know is dead (../email/notify.ts).
+ *    6. already / pending   short circuits that send nothing.
+ *    7. global send cap     the page-wide backstop, consumed only when we are about to send.
+ *
+ *  Steps 1 and 5 are silent: they render the ordinary "check your inbox" page. A bot that
+ *  can tell it was dropped just adjusts, and telling a caller an address is suppressed would
+ *  turn this endpoint into an oracle for which addresses have bounced. Every branch writes to
+ *  `subscribe_attempts`, which is where the difference is actually visible. */
 async function subscribeOutcome(c: Ctx): Promise<SubscribeOutcome> {
   const form = await c.req.parseBody({ all: true });
   const email = String(form.email ?? "").trim().toLowerCase();
+  const ip = clientIp(c.req.raw);
 
-  // Abuse guards (2026-07 subscription-bombing wave): every attempt consumes
-  // rate-limit budget, then the Turnstile token is verified server-side.
-  const ip = c.req.header("cf-connecting-ip") ?? "";
+  /** What a real new subscriber sees — and what every silently-dropped submission sees, so
+   *  the two are indistinguishable from outside. */
+  const checkInbox = (): SubscribeOutcome => ({
+    ok: true,
+    state: "sent",
+    status: 200,
+    title: "Check your inbox!",
+    message: `We sent a confirmation link to ${email}. Validate your email to receive updates and you are all set — the link expires in 7 days. If it doesn't arrive, check your spam folder.`,
+  });
+
+  // 1. Honeypot — a hidden field no human can see. Checked before anything else, including
+  // email validity: a bot that fills it gets no subscriber row, no send, and no signal.
+  if (String(form[HONEYPOT_FIELD] ?? "").trim() !== "") {
+    await recordAttempt(c.env, { ip, email, outcome: "honeypot" });
+    return checkInbox();
+  }
+
+  // 2 and 3. Abuse guards (2026-07 subscription-bombing wave): every attempt consumes the
+  // caller's own rate-limit budget, then the Turnstile token is verified server-side. The
+  // page-wide budget is NOT consumed here — see step 7.
   if (!(await checkSubscribeRateLimit(c.env, ip))) {
+    await recordAttempt(c.env, { ip, email, outcome: "rate_limited" });
     return {
       ok: false,
       state: "rate_limited",
@@ -334,6 +371,7 @@ async function subscribeOutcome(c: Ctx): Promise<SubscribeOutcome> {
   }
   const turnstileToken = String(form["cf-turnstile-response"] ?? "");
   if (!(await verifyTurnstile(c.env, turnstileToken, ip))) {
+    await recordAttempt(c.env, { ip, email, outcome: "captcha_failed" });
     return {
       ok: false,
       state: "captcha_failed",
@@ -344,6 +382,7 @@ async function subscribeOutcome(c: Ctx): Promise<SubscribeOutcome> {
   }
 
   if (!isValidEmail(email)) {
+    await recordAttempt(c.env, { ip, email, outcome: "invalid_email" });
     return {
       ok: false,
       state: "invalid_email",
@@ -353,6 +392,15 @@ async function subscribeOutcome(c: Ctx): Promise<SubscribeOutcome> {
     };
   }
 
+  // 5. On the never-mail list (hard bounce, complaint, or abuse) → drop it here rather than
+  // at the mailer. The transport refuses the send either way, but stopping this early avoids
+  // minting a pending row, which would otherwise sit in `subscribers` for 7 days and make
+  // every later attempt fall into the `already_pending` branch below.
+  if (await isSuppressed(c.env, email)) {
+    await recordAttempt(c.env, { ip, email, outcome: "suppressed" });
+    return checkInbox();
+  }
+
   // Already an active subscriber → nothing to do.
   const active = await c.env.DB.prepare(
     "SELECT id FROM subscribers WHERE email = ? AND accepted_at IS NOT NULL AND unsubscribed_at IS NULL LIMIT 1",
@@ -360,6 +408,7 @@ async function subscribeOutcome(c: Ctx): Promise<SubscribeOutcome> {
     .bind(email)
     .first();
   if (active) {
+    await recordAttempt(c.env, { ip, email, outcome: "already_subscribed" });
     return {
       ok: true,
       state: "already",
@@ -376,6 +425,7 @@ async function subscribeOutcome(c: Ctx): Promise<SubscribeOutcome> {
     .bind(email, nowIso())
     .first();
   if (pending) {
+    await recordAttempt(c.env, { ip, email, outcome: "already_pending" });
     return {
       ok: true,
       state: "pending",
@@ -383,6 +433,16 @@ async function subscribeOutcome(c: Ctx): Promise<SubscribeOutcome> {
       title: "Check your inbox!",
       message: `We already sent a confirmation link to ${email}. Click it to finish subscribing — it can take a minute to arrive, so remember to look in spam.`,
     };
+  }
+
+  // 7. The page-wide send cap — the last gate, because everything above sends nothing and so
+  // must not spend a budget that is shared with every other visitor. Nothing is written to
+  // `subscribers` when it trips: leaving a pending row behind would make the *next*,
+  // legitimate attempt fall into the already_pending branch above and never send. The excess
+  // is refused outright, not queued — there is no retry.
+  if (!(await reserveGlobalSend(c.env))) {
+    await recordAttempt(c.env, { ip, email, outcome: "global_limited" });
+    return checkInbox();
   }
 
   // Component scope from the popover picker: absent/empty ⇒ whole page.
@@ -403,15 +463,12 @@ async function subscribeOutcome(c: Ctx): Promise<SubscribeOutcome> {
     .bind(token, email, JSON.stringify(componentIds), expires, now, now)
     .run();
 
+  // Recorded before the send, not after: the row is the audit trail's record that we decided
+  // to send, and it must exist even if the mailer is slow or the request is cut short.
+  await recordAttempt(c.env, { ip, email, outcome: "sent" });
   await sendVerification(c.env, email, token);
 
-  return {
-    ok: true,
-    state: "sent",
-    status: 200,
-    title: "Check your inbox!",
-    message: `We sent a confirmation link to ${email}. Validate your email to receive updates and you are all set — the link expires in 7 days. If it doesn't arrive, check your spam folder.`,
-  };
+  return checkInbox();
 }
 
 export async function handleSubscribe(c: Ctx): Promise<Response> {

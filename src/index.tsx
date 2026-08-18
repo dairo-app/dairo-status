@@ -18,6 +18,7 @@ import {
 import { EventNotFound, EventsPage, MaintenanceDetail, ReportDetail } from "./pages/events";
 import { buildFeed } from "./feeds/feed";
 import { handleIngest, handleMonitors } from "./data/ingest";
+import { handleEmailEvents } from "./data/bounces";
 import {
   handleSubscribe,
   ManagePage,
@@ -156,5 +157,8 @@ app.post("/unsubscribe/:token", handleUnsubscribe);
 // ── Health checker: monitor list + result ingest ─────────────────────────────────────
 app.get("/api/monitors", handleMonitors);
 app.post("/ingest", handleIngest);
+
+// ── Dairo delivery feedback: hard bounces + complaints → the suppression list ─────────
+app.post("/api/email-events", handleEmailEvents);
 
 export default app;
