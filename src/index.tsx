@@ -33,6 +33,32 @@ const app = new Hono<{ Bindings: Env }>();
 
 app.get("/health", (c) => c.text("ok"));
 
+// Statuspage-compatible summary for the dairo.app footer pill. Public, read-only and
+// cross-origin readable (the landing is a static site on another origin), so it carries
+// a wildcard CORS header and a short cache. indicator: none | minor | major | critical.
+app.get("/api/status/current.json", async (c) => {
+  const board = await loadBoard(c.env);
+  const indicator =
+    board?.overall === "success"
+      ? "none"
+      : board?.overall === "degraded"
+        ? "minor"
+        : board?.overall === "error"
+          ? "major"
+          : "unknown";
+  const description =
+    indicator === "none"
+      ? "All systems operational"
+      : indicator === "minor"
+        ? "Degraded performance"
+        : indicator === "major"
+          ? "Partial or major outage"
+          : "";
+  c.header("Access-Control-Allow-Origin", "*");
+  c.header("Cache-Control", "public, max-age=60");
+  return c.json({ status: { indicator, description }, updated_at: new Date().toISOString() });
+});
+
 // ── Status board ────────────────────────────────────────────────────────────────────
 app.get("/", async (c) => {
   const board = await loadBoard(c.env);
